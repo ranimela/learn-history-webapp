@@ -17,27 +17,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request parameters" }, { status: 400 });
     }
 
-    const { pageId, title, difficulty = 3 } = parsed.data;
+    const { pageId, title, difficulty = 3, refresh = false } = parsed.data;
 
-    // Check if content already generated and cached for this Wikipedia page
-    const existingTopic = await db
-      .select()
-      .from(topics)
-      .where(eq(topics.wikiPageId, pageId))
-      .get();
-
-    if (existingTopic) {
-      const existingContent = await db
+    // Check if content already generated and cached for this Wikipedia page (unless refresh is requested)
+    if (!refresh) {
+      const existingTopic = await db
         .select()
-        .from(contents)
-        .where(eq(contents.topicId, existingTopic.id))
+        .from(topics)
+        .where(eq(topics.wikiPageId, pageId))
         .get();
 
-      if (existingContent) {
-        return NextResponse.json({
-          contentId: existingContent.id,
-          cached: true,
-        });
+      if (existingTopic) {
+        const existingContent = await db
+          .select()
+          .from(contents)
+          .where(eq(contents.topicId, existingTopic.id))
+          .get();
+
+        if (existingContent) {
+          return NextResponse.json({
+            contentId: existingContent.id,
+            cached: true,
+          });
+        }
+      }
+    } else {
+      // Purge any stale existing topic records for this pageId
+      const oldTopics = await db
+        .select()
+        .from(topics)
+        .where(eq(topics.wikiPageId, pageId))
+        .all();
+      for (const ot of oldTopics) {
+        await db.delete(topics).where(eq(topics.id, ot.id));
       }
     }
 

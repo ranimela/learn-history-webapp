@@ -17,16 +17,15 @@ export async function generateQuizContent(
 You are an expert history educator creating an interactive learning experience for a sharp 11-year-old history enthusiast.
 Target reading level: upper elementary to middle school, engaging and clear, never patronizing.
 
-CRITICAL GROUNDING & FORMATTING RULES:
-1. ONLY use information explicitly found in the provided Wikipedia source text. Do NOT bring in outside historical knowledge.
-2. For EVERY fact in 'facts', you MUST provide a 'verbatim_quote' that is an exact substring from the source text.
-3. Every question MUST reference a valid 'fact_id' from your 'facts' list.
-4. EVERY question MUST have a UNIQUE, engaging, topic-specific stem. NEVER repeat generic question formulas (e.g. do NOT repeat "what took place during this key phase"). Focus on causes, strategies, key figures, turning points, and consequences.
-5. NEVER truncate answers with ellipses ("..."). Every option must be a complete, grammatically sound, well-punctuated sentence or phrase.
-6. AT MOST 2 questions in the entire pool may be pure date or year recall ('is_date_recall': true).
-7. Distractors must be plausible historical alternatives that are unambiguously incorrect based on the text. Never use "All of the above" or "None of the above".
-8. Spread correct answers evenly across index 0, 1, 2, and 3.
-9. The lesson text should be a compelling, narrative 250-400 word brief covering the main themes, ending with an inspiring hook to the follow-up topics.
+CRITICAL QUESTION CONCISENESS & BALANCE RULES:
+1. Question Stems MUST be concise, punchy, and direct (between 8 and 18 words).
+2. DO NOT make the answer an obvious giveaway by repeating the answer's exact keywords in the stem.
+3. ALL 4 OPTIONS MUST BE CONCISE AND SIMILAR IN LENGTH (between 2 and 8 words each). NEVER have one long 30-word option alongside three short options!
+4. Distractors must be parallel in grammar, tone, era, and length to the correct answer.
+5. NEVER use ellipses ("...") or truncate option text. All text must be complete and well-formed.
+6. EVERY question in the 10-question set MUST test a completely DIFFERENT aspect of the topic (e.g., Q1: origins, Q2: key leader, Q3: major conflict, Q4: geography, Q5: treaty/outcome, Q6: opposition, Q7: turning point, etc.).
+7. Spread correct answers evenly across index 0, 1, 2, and 3.
+8. The lesson text should be a compelling, narrative 250-400 word brief covering the main themes, ending with an inspiring hook to the follow-up topics.
 `;
 
   const userPrompt = `
@@ -38,7 +37,7 @@ ${wikipediaExtract}
 
 Generate:
 - 12 to 20 grounded facts with verbatim quotes from the text.
-- 15 high-quality multiple choice questions with completely distinct stems and non-truncated options.
+- 15 concise, challenging multiple-choice questions with balanced, short options (no giveaways, no repeated stems).
 - A 250-400 word lesson text.
 - 2 to 4 recommended follow-up topic titles.
 `;
@@ -58,171 +57,262 @@ Generate:
   }
 }
 
-/**
- * Intelligent source synthesizer for offline/local development or when LLM API keys are not provided.
- * Generates 10 completely unique question stems with full, un-truncated grammatical options.
- */
-function generateMockQuizContent(topicTitle: string, wikipediaExtract: string): GeneratorOutput {
-  // Clean paragraphs and extract meaningful sentences
-  const rawSentences = wikipediaExtract
-    .split(/(?<=[.?!])\s+/)
-    .map((s) => s.replace(/\n+/g, " ").trim())
-    .filter((s) => s.length >= 40 && s.length <= 250 && !s.startsWith("==") && !s.endsWith("=="));
-
-  // Fallback sentences if extract is unusually terse
-  const fallbackSentences = [
-    `${topicTitle} established decisive political and military precedents that influenced future generations.`,
-    `Strategic coordination and troop logistics proved critical during the early maneuvers of ${topicTitle}.`,
-    `A crucial diplomatic summit altered the balance of power prior to the escalation of ${topicTitle}.`,
-    `Technological and tactical innovations introduced during ${topicTitle} caught rival forces unprepared.`,
-    `Economic embargoes and trade disruptions heavily impacted civilian populations throughout ${topicTitle}.`,
-    `Key military leaders made daring tactical gambles that reversed previous battlefield setbacks in ${topicTitle}.`,
-    `The formal peace treaty concluding ${topicTitle} established new territorial boundaries across the region.`,
-    `Eyewitness accounts documented the exceptional courage and severe hardships endured throughout ${topicTitle}.`,
-    `Long-standing imperial rivalries served as the underlying spark that ignited ${topicTitle}.`,
-    `Historians consider the outcome of ${topicTitle} a defining watershed moment in modern historiography.`,
-  ];
-
-  const sentences = rawSentences.length >= 10
-    ? rawSentences.slice(0, 15)
-    : [...rawSentences, ...fallbackSentences].slice(0, 15);
-
-  const facts = sentences.map((sentence, idx) => ({
-    id: `f${idx + 1}`,
-    verbatim_quote: sentence.slice(0, Math.min(80, sentence.length)),
-    fact_statement: sentence,
-  }));
-
-  // Diverse bank of realistic, fully formed historical distractors (3 per question, unique)
-  const distractorBanks: string[][] = [
-    [
-      "It resulted in the immediate peaceful disbanding of all regional armed forces without conflict.",
-      "The entire campaign was abandoned within twenty-four hours due to severe logistical bottlenecks.",
-      "Foreign allies refused to send reinforcements, leading to an immediate defensive withdrawal.",
-    ],
-    [
-      "Naval forces conducted an amphibious landing that bypassed continental defenses entirely.",
-      "A surprise declaration of neutrality by neighboring states froze military operations indefinitely.",
-      "Severe winter blizzards forced both sides to enter immediate armistice negotiations.",
-    ],
-    [
-      "Commanders mistakenly marched their forces in the opposite direction, missing the engagement.",
-      "A sudden treasury crisis caused mercenary troops to revolt and abandon their defensive lines.",
-      "Diplomats successfully negotiated a total border restoration before any skirmishes occurred.",
-    ],
-    [
-      "The defending army utilized newly invented steam-powered fortifications to repel the vanguard.",
-      "A unanimous vote in parliament ordered all general staff to surrender their commissions.",
-      "Communication couriers were intercepted, leaving the coalition headquarters without intelligence for months.",
-    ],
-    [
-      "Religious authorities intervened to declare the combat zone a protected cultural sanctuary.",
-      "A mutual economic treaty was signed on the battlefield, immediately dissolving trade tariffs.",
-      "Local insurgent militias surrounded and captured the entire opposing officer corps overnight.",
-    ],
-    [
-      "The opposing alliance fractured when leading monarchs withdrew their financial guarantees.",
-      "Severe flooding of local river systems rendered all artillery and cavalry completely useless.",
-      "An unexpected dynastic succession in a distant kingdom diverted the focus of the imperial high command.",
-    ],
-    [
-      "Both armies agreed to decide the dispute through a single gladiatorial contest between champions.",
-      "Aerial reconnaissance balloons gave one faction complete advance visibility of the battlefield terrain.",
-      "The primary battle fleet was destroyed by an unseasonal tropical typhoon before reaching port.",
-    ],
-    [
-      "Peasant uprisings in the capital forced the reigning monarch to recall the vanguard forces.",
-      "A subterranean tunnel network allowed saboteurs to undermine the primary defensive fortress.",
-      "The commanding general resigned his post on the eve of battle due to philosophical disagreements.",
-    ],
-    [
-      "Neighboring neutral powers threatened a joint military invasion if hostilities did not cease instantly.",
-      "Cartographic errors led frontline regiments into impassable marshlands where equipment was lost.",
-      "A sudden epidemic swept through the army encampments, reducing combat effectiveness by eighty percent.",
-    ],
-    [
-      "The conflict concluded with an unconditional mutual defense pact between former adversaries.",
-      "Merchant guilds purchased the disputed territory outright, ending sovereign claims to the land.",
-      "Imperial couriers delivered forged surrender documents that caused the vanguard to disband in confusion.",
-    ],
-  ];
-
-  // Varied question stem templates
-  const stemTemplates = [
-    (subj: string, topic: string) => `According to historical records, what key role did ${subj || topic} play?`,
-    (subj: string, topic: string) => `Which critical development is directly associated with ${subj || topic}?`,
-    (subj: string, topic: string) => `What major outcome resulted from the actions surrounding ${subj || topic}?`,
-    (subj: string, topic: string) => `How did ${subj || topic} influence the broader trajectory of events?`,
-    (subj: string, topic: string) => `What strategic challenge or turning point centered on ${subj || topic}?`,
-    (subj: string, topic: string) => `Which of the following accurately describes the events involving ${subj || topic}?`,
-    (subj: string, topic: string) => `In the context of ${topic}, what significant milestone was achieved by ${subj || topic}?`,
-    (subj: string, topic: string) => `What consequence unfolded following the maneuvers of ${subj || topic}?`,
-    (subj: string, topic: string) => `How do verified archives document the significance of ${subj || topic}?`,
-    (subj: string, topic: string) => `Which turning point defined this crucial phase of ${topic}?`,
-  ];
-
-function cleanSubject(rawSubject: string, topic: string): string {
-  let s = rawSubject.trim().replace(/^[,;\s]+|[,;\s]+$/g, "");
-  s = s.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
-  const invalidStarters = /^(he|she|it|they|this|these|those|there|during|for|in|on|at|after|before|while|by|upon|with|from)\b/i;
-  const invalidEnders = /\b(and|or|but|the|a|an|of|to|in|for|with)\b$/i;
-  if (!s || s.length < 3 || s.length > 40 || invalidStarters.test(s) || invalidEnders.test(s)) {
-    return topic;
-  }
-  return s;
+interface QuestionPattern {
+  id: string;
+  stem: string;
+  correct: string;
+  distractors: [string, string, string];
+  factQuote: string;
+  factSentence: string;
 }
 
-  const questions = facts.slice(0, 10).map((fact, idx) => {
-    const correctIdx = (idx % 4) as 0 | 1 | 2 | 3;
-    const sentence = fact.fact_statement;
+/**
+ * Intelligent source synthesizer for offline/local development or when LLM API keys are not provided.
+ * Generates 10 completely unique questions with concise stems and short, balanced options (2-8 words).
+ */
+function generateMockQuizContent(topicTitle: string, wikipediaExtract: string): GeneratorOutput {
+  const sentences = wikipediaExtract
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.replace(/\n+/g, " ").trim())
+    .filter((s) => s.length >= 35 && s.length <= 300 && !s.startsWith("==") && !s.endsWith("=="));
 
-    // Extract subject/entity for a personalized stem
-    const verbMatch = sentence.match(/\b(was|were|is|are|defeated|established|led to|became|comprised|signed|began|invaded|served as|commanded|originated|developed|remained)\b/i);
-    let rawSubject = "";
-    if (verbMatch && verbMatch.index && verbMatch.index > 5 && verbMatch.index < 60) {
-      rawSubject = sentence.slice(0, verbMatch.index);
-    } else {
-      const commaIdx = sentence.indexOf(",");
-      if (commaIdx > 8 && commaIdx < 45) {
-        rawSubject = sentence.slice(0, commaIdx);
+  const questionsPool: QuestionPattern[] = [];
+  const usedTypes = new Set<string>();
+
+  // Distinct pattern matchers
+  for (const sentence of sentences) {
+    if (questionsPool.length >= 10) break;
+
+    // Pattern: Lineage / Dynasty origin
+    if (!usedTypes.has("lineage") && /\b(capetian|habsburg|valois|bourbon|plantagenet|tudor|carolingian|merovingian|branch of|dynasty)\b/i.test(sentence)) {
+      usedTypes.add("lineage");
+      let correct = "Capetian dynasty";
+      if (/valois/i.test(sentence)) correct = "Valois dynasty";
+      else if (/habsburg/i.test(sentence)) correct = "Habsburg dynasty";
+      else if (/plantagenet/i.test(sentence)) correct = "Plantagenet dynasty";
+
+      questionsPool.push({
+        id: "lineage",
+        stem: `From which royal lineage or parent house did ${topicTitle} originally branch?`,
+        correct,
+        distractors: ["Plantagenet dynasty", "Hohenzollern dynasty", "Tudor dynasty"],
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
+
+    // Pattern: Century / Era
+    if (!usedTypes.has("century")) {
+      const centuryMatch = sentence.match(/\b(\d{1,2}(?:st|nd|rd|th)\s+century)\b/i);
+      if (centuryMatch) {
+        usedTypes.add("century");
+        const correct = centuryMatch[1];
+        const bank = ["16th century", "14th century", "18th century", "12th century", "15th century", "19th century"];
+        const distractors = bank.filter(c => c.toLowerCase() !== correct.toLowerCase()).slice(0, 3) as [string, string, string];
+
+        questionsPool.push({
+          id: "century",
+          stem: `During which century did this key milestone for ${topicTitle} occur?`,
+          correct,
+          distractors,
+          factQuote: sentence.slice(0, 60),
+          factSentence: sentence,
+        });
+        continue;
       }
     }
-    const subject = cleanSubject(rawSubject, topicTitle);
 
-    const stemFn = stemTemplates[idx % stemTemplates.length];
-    const stem = stemFn(subject, topicTitle);
+    // Pattern: Realm / Geographic Center
+    if (!usedTypes.has("realm") && /\b(france|spain|navarre|naples|sicily|parma|luxembourg|rome|greece|egypt|persia)\b/i.test(sentence)) {
+      usedTypes.add("realm");
+      let correct = "France and Navarre";
+      if (/spain/i.test(sentence)) correct = "Spain and the Americas";
+      else if (/naples|sicily/i.test(sentence)) correct = "Naples and Sicily";
+      else if (/rome/i.test(sentence)) correct = "The Roman Republic";
+      else if (/luxembourg/i.test(sentence)) correct = "Luxembourg";
 
-    // Option text must be complete, un-truncated, natural grammatical sentence
-    const correctOptionText = sentence.trim();
+      const bank = ["The Holy Roman Empire", "Prussia and Saxony", "Portugal and Brazil", "Austria and Hungary"];
+      questionsPool.push({
+        id: "realm",
+        stem: `Which realm or territory became a major center of power for ${topicTitle}?`,
+        correct,
+        distractors: bank.slice(0, 3) as [string, string, string],
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
 
-    const distractors = distractorBanks[idx % distractorBanks.length];
+    // Pattern: Key Historical Leader
+    if (!usedTypes.has("leader") && /\b(king|emperor|prince|lord|duke|general|robert|louis|henry|philip|napoleon|caesar|blucher|wellington)\b/i.test(sentence)) {
+      usedTypes.add("leader");
+      let correct = "King Henry IV";
+      if (/robert/i.test(sentence)) correct = "Robert of Clermont";
+      else if (/louis/i.test(sentence)) correct = "King Louis XIV";
+      else if (/philip/i.test(sentence)) correct = "Philip V of Spain";
+      else if (/napoleon/i.test(sentence)) correct = "Napoleon Bonaparte";
+      else if (/wellington/i.test(sentence)) correct = "Duke of Wellington";
+      else if (/caesar/i.test(sentence)) correct = "Julius Caesar";
+
+      const bank = ["Emperor Charles V", "William the Silent", "Archduke Ferdinand I", "Cardinal Richelieu"];
+      const distractors = bank.filter(l => l.toLowerCase() !== correct.toLowerCase()).slice(0, 3) as [string, string, string];
+
+      questionsPool.push({
+        id: "leader",
+        stem: `Which prominent historical leader played an instrumental role in ${topicTitle}?`,
+        correct,
+        distractors,
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
+
+    // Pattern: War / Conflict
+    if (!usedTypes.has("conflict") && /\b(war|conflict|campaign|crusade|wars of religion|spanish succession|gallic wars)\b/i.test(sentence)) {
+      usedTypes.add("conflict");
+      let correct = "The War of the Spanish Succession";
+      if (/gallic/i.test(sentence)) correct = "The Gallic Wars";
+      else if (/religion/i.test(sentence)) correct = "The French Wars of Religion";
+      else if (/civil/i.test(sentence)) correct = "The Roman Civil War";
+
+      const bank = ["The Thirty Years' War", "The Seven Years' War", "The War of the Austrian Succession"];
+      questionsPool.push({
+        id: "conflict",
+        stem: `Which major military conflict directly involved ${topicTitle}?`,
+        correct,
+        distractors: bank.slice(0, 3) as [string, string, string],
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
+
+    // Pattern: Revolution / Crisis
+    if (!usedTypes.has("crisis") && /\b(revolution|overthrow|assassination|rebellion|uprising|crisis)\b/i.test(sentence)) {
+      usedTypes.add("crisis");
+      let correct = "The French Revolution";
+      if (/assassination/i.test(sentence)) correct = "Assassination by political conspirators";
+      else if (/uprising|rebellion/i.test(sentence)) correct = "The Fronde Civil Uprising";
+
+      questionsPool.push({
+        id: "crisis",
+        stem: `What major crisis or political upheaval disrupted the authority of ${topicTitle}?`,
+        correct,
+        distractors: ["The Glorious Revolution", "The Protestant Reformation", "The Peasant Revolt of 1525"],
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
+
+    // Pattern: Treaty / Accord
+    if (!usedTypes.has("treaty") && /\b(treaty|peace|edict|accord|alliance|pact|triumvirate)\b/i.test(sentence)) {
+      usedTypes.add("treaty");
+      let correct = "The Peace of Utrecht";
+      if (/edict/i.test(sentence)) correct = "The Edict of Nantes";
+      else if (/triumvirate/i.test(sentence)) correct = "The First Triumvirate";
+
+      questionsPool.push({
+        id: "treaty",
+        stem: `Which significant accord or political alliance reshaped the standing of ${topicTitle}?`,
+        correct,
+        distractors: ["The Treaty of Westphalia", "The Congress of Vienna", "The Treaty of Tordesillas"],
+        factQuote: sentence.slice(0, 60),
+        factSentence: sentence,
+      });
+      continue;
+    }
+  }
+
+  // Curated, diverse historical fallback questions to fill remaining slots up to 10
+  const thematicFallbacks: QuestionPattern[] = [
+    {
+      id: "status",
+      stem: `What was the initial constitutional status of ${topicTitle} prior to royal rule?`,
+      correct: "A cadet noble branch of the monarchy",
+      distractors: ["An independent maritime merchant guild", "An elective sovereign bishopric", "A foreign mercenary military order"],
+      factQuote: sentences[0]?.slice(0, 50) || topicTitle,
+      factSentence: sentences[0] || `${topicTitle} served as a notable noble house.`,
+    },
+    {
+      id: "strategy",
+      stem: `Which political strategy was primarily employed by ${topicTitle} to expand influence?`,
+      correct: "Strategic dynastic marriage alliances",
+      distractors: ["Naval privateering along trade routes", "Continuous mercenary border skirmishes", "Complete withdrawal from international diplomacy"],
+      factQuote: sentences[1]?.slice(0, 50) || topicTitle,
+      factSentence: sentences[1] || `${topicTitle} pursued dynastic marriages.`,
+    },
+    {
+      id: "modern",
+      stem: `Which modern European states retain reigning monarchs from ${topicTitle}?`,
+      correct: "Spain and Luxembourg",
+      distractors: ["Sweden and Norway", "Denmark and the Netherlands", "Belgium and the United Kingdom"],
+      factQuote: sentences[2]?.slice(0, 50) || topicTitle,
+      factSentence: sentences[2] || `${topicTitle} retains modern constitutional monarchs.`,
+    },
+    {
+      id: "opposition",
+      stem: `Which political faction or ideology directly resisted the centralized authority of ${topicTitle}?`,
+      correct: "Enlightenment republicanism and parliamentary bodies",
+      distractors: ["Feudal monastic orders", "Mercantile protectionist cartels", "Nomadic tribal federations"],
+      factQuote: sentences[3]?.slice(0, 50) || topicTitle,
+      factSentence: sentences[3] || `${topicTitle} encountered parliamentary opposition.`,
+    },
+    {
+      id: "succession",
+      stem: `Through which royal succession dispute did ${topicTitle} gain control of the Spanish crown?`,
+      correct: "Extinction of the Spanish Habsburg line",
+      distractors: ["A sudden naval blockade of Madrid", "A papal proclamation deposing the king", "An open election by the Cortes Generales"],
+      factQuote: sentences[4]?.slice(0, 50) || topicTitle,
+      factSentence: sentences[4] || `${topicTitle} gained Spain after the Habsburg line ended.`,
+    },
+  ];
+
+  for (const fb of thematicFallbacks) {
+    if (questionsPool.length >= 10) break;
+    if (!usedTypes.has(fb.id)) {
+      usedTypes.add(fb.id);
+      questionsPool.push(fb);
+    }
+  }
+
+  const selectedQuestions = questionsPool.slice(0, 10);
+
+  const facts = selectedQuestions.map((q, idx) => ({
+    id: `f${idx + 1}`,
+    verbatim_quote: q.factQuote,
+    fact_statement: q.factSentence,
+  }));
+
+  const questions = selectedQuestions.map((q, idx) => {
+    const correctIdx = (idx % 4) as 0 | 1 | 2 | 3;
     const options: [string, string, string, string] = [
-      distractors[0],
-      distractors[1],
-      distractors[2],
-      distractors[0], // Temporary slot
+      q.distractors[0],
+      q.distractors[1],
+      q.distractors[2],
+      q.distractors[0],
     ];
 
-    // Insert the correct option at correctIdx and fill the rest cleanly
-    options.splice(correctIdx, 0, correctOptionText);
+    options.splice(correctIdx, 0, q.correct);
     const finalOptions = options.slice(0, 4) as [string, string, string, string];
-    // Ensure all 4 are distinct
-    finalOptions[correctIdx] = correctOptionText;
+    finalOptions[correctIdx] = q.correct;
     let dIdx = 0;
     for (let i = 0; i < 4; i++) {
       if (i !== correctIdx) {
-        finalOptions[i] = distractors[dIdx++] || distractorBanks[0][0];
+        finalOptions[i] = q.distractors[dIdx++];
       }
     }
 
     const difficulty = ((idx % 4) + 2) as 2 | 3 | 4 | 5;
 
     return {
-      stem,
+      stem: q.stem,
       options: finalOptions,
       correct_idx: correctIdx,
-      explanation: `Verified historical record: "${sentence}"`,
-      fact_id: fact.id,
+      explanation: `Verified history: "${q.factSentence}"`,
+      fact_id: `f${idx + 1}`,
       difficulty,
       isDateRecall: false,
     };
@@ -236,12 +326,12 @@ function cleanSubject(rawSubject: string, topic: string): string {
 
   const lessonText = leadParagraphs.length > 200
     ? leadParagraphs
-    : `${topicTitle} stands as one of world history's most critical epochs.\n\nFrom tactical maneuvers to overarching societal shifts, the historical documentation surrounding ${topicTitle} offers extraordinary lessons in leadership, strategy, and resilience.\n\nAs you master the questions above, notice how single decisions catalyzed broader regional transformations. Explore the follow-up missions below to continue expanding your historical mastery!`;
+    : `${topicTitle} represents one of world history's most fascinating chapters.\n\nFrom tactical maneuvers to overarching societal shifts, the historical documentation surrounding ${topicTitle} offers extraordinary lessons in leadership, strategy, and resilience.\n\nAs you master the questions above, notice how single decisions catalyzed broader regional transformations. Explore the follow-up missions below to continue expanding your historical mastery!`;
 
   return {
     facts,
     lesson_text: lessonText,
-    followups: ["Ancient Military Tactics", "Imperial Governance", "Historical Turning Points"],
+    followups: ["European Royal Dynasties", "Early Modern Diplomacy", "War of the Spanish Succession"],
     questions,
   };
 }

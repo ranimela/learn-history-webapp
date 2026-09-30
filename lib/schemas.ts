@@ -81,6 +81,7 @@ export const GenerateContentRequestSchema = z.object({
   pageId: z.number(),
   title: z.string(),
   difficulty: z.number().min(1).max(5).optional(),
+  refresh: z.boolean().optional(),
 });
 
 export const SubmitAnswerRequestSchema = z.object({
