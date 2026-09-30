@@ -19,7 +19,7 @@ export type FactItem = z.infer<typeof FactItemSchema>;
 
 export const RawQuestionSchema = z.object({
   stem: z.string().min(10),
-  options: z.tuple([z.string(), z.string(), z.string(), z.string()]),
+  options: z.array(z.string()).min(4).max(4),
   correct_idx: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
   explanation: z.string().min(10),
   fact_id: z.string(),
@@ -58,7 +58,7 @@ export type ValidatorOutput = z.infer<typeof ValidatorOutputSchema>;
 export const PublicQuizQuestionSchema = z.object({
   id: z.string(),
   stem: z.string(),
-  options: z.tuple([z.string(), z.string(), z.string(), z.string()]),
+  options: z.array(z.string()).min(4).max(4),
   difficulty: z.number(),
 });
 export type PublicQuizQuestion = z.infer<typeof PublicQuizQuestionSchema>;

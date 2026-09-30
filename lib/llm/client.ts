@@ -3,12 +3,12 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 /**
  * Returns a configured AI language model based on environment variables.
- * Defaults to Google Gemini (gemini-1.5-flash), with support for OpenAI.
+ * Defaults to Google Gemini 3.5 Flash-Lite for speed, reasoning, and quota stability.
  */
 export function getLanguageModel() {
   const provider = (process.env.LLM_PROVIDER || "google").toLowerCase();
   const apiKey = process.env.LLM_API_KEY || process.env.GEMINI_API_KEY || "";
-  const modelName = process.env.LLM_MODEL || (provider === "google" ? "gemini-1.5-flash" : "gpt-4o-mini");
+  const modelName = process.env.LLM_MODEL || (provider === "google" ? "gemini-3.5-flash-lite" : "gpt-4o-mini");
 
   if (provider === "google") {
     const google = createGoogleGenerativeAI({ apiKey });
