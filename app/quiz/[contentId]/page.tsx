@@ -13,6 +13,7 @@ import {
   Award,
   Zap,
 } from "lucide-react";
+import { soundFX } from "@/lib/audio";
 
 interface AnswerFeedback {
   isCorrect: boolean;
@@ -144,6 +145,9 @@ export default function QuizRunnerPage() {
 
       if (data.isCorrect) {
         setCurrentScore((s) => s + 1);
+        soundFX.playCorrect();
+      } else {
+        soundFX.playIncorrect();
       }
     } catch (err: any) {
       console.error("Submission error:", err);
@@ -153,6 +157,7 @@ export default function QuizRunnerPage() {
   };
 
   const handleNext = () => {
+    soundFX.playClick();
     if (isLastQuestion) {
       router.push(`/results/${attemptId}`);
     } else {

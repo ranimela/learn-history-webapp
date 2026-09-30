@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Compass, Swords, ArrowRight, Loader2, Sparkles, BookOpen } from "lucide-react";
 import { WikipediaCandidate } from "@/lib/schemas";
 
@@ -13,9 +13,12 @@ interface RecentTopic {
   contentId: string;
 }
 
-export default function HomePage() {
+function HomeContent() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const queryParam = searchParams.get("q") || "";
+
+  const [query, setQuery] = useState(queryParam);
   const [isResolving, setIsResolving] = useState(false);
   const [candidates, setCandidates] = useState<WikipediaCandidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<WikipediaCandidate | null>(null);
@@ -40,86 +43,34 @@ export default function HomePage() {
       .catch((err) => console.error("Failed to load recent topics:", err));
   }, []);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim() || isResolving) return;
+  const pollJob = useCallback((jobId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const job = data.job;
 
-    setIsResolving(true);
-    setCandidates([]);
-    setSelectedCandidate(null);
-    setJobError(null);
+        setJobProgress(job.progressPercent || 25);
+        setJobMessage(job.message || "Synthesizing content...");
 
-    try {
-      const res = await fetch("/api/topic/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search failed");
-
-      if (!data.candidates || data.candidates.length === 0) {
-        setJobError("No matching historical records found. Try another topic!");
-        setIsResolving(false);
-        return;
+        if (job.status === "completed" && job.contentId) {
+          clearInterval(interval);
+          setTimeout(() => {
+            router.push(`/quiz/${job.contentId}`);
+          }, 800);
+        } else if (job.status === "failed") {
+          clearInterval(interval);
+          setJobError(job.error || "Generation failed.");
+          setActiveJobId(null);
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
       }
+    }, 1500);
+  }, [router]);
 
-      if (data.candidates.length === 1) {
-        // Direct match, start generation immediately
-        startGeneration(data.candidates[0]);
-      } else {
-        // Disambiguation
-        setCandidates(data.candidates);
-      }
-    } catch (err: any) {
-      setJobError(err.message || "Failed to resolve topic.");
-    } finally {
-      setIsResolving(false);
-    }
-  };
-
-  const startGeneration = async (candidate: WikipediaCandidate) => {
-    setSelectedCandidate(candidate);
-    setCandidates([]);
-    setJobError(null);
-    setJobProgress(10);
-    setJobMessage("Initializing mission generator...");
-
-    try {
-      const res = await fetch("/api/content/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pageId: candidate.pageId,
-          title: candidate.title,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation request failed");
-
-      if (data.cached && data.contentId) {
-        // Cached quiz immediately ready!
-        setJobProgress(100);
-        setJobMessage("Archive match found! Entering arena...");
-        setTimeout(() => {
-          router.push(`/quiz/${data.contentId}`);
-        }, 600);
-        return;
-      }
-
-      // Track async job via SSE or polling
-      setActiveJobId(data.jobId);
-      listenToJob(data.jobId);
-    } catch (err: any) {
-      setJobError(err.message || "Failed to initiate generation");
-      setActiveJobId(null);
-    }
-  };
-
-  const listenToJob = (jobId: string) => {
-    // Attempt SSE stream first
+  const listenToJob = useCallback((jobId: string) => {
     const eventSource = new EventSource(`/api/jobs/${jobId}/stream`);
 
     eventSource.addEventListener("update", (e) => {
@@ -148,33 +99,97 @@ export default function HomePage() {
       // Fallback to polling
       pollJob(jobId);
     });
-  };
+  }, [router, pollJob]);
 
-  const pollJob = async (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/jobs/${jobId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const job = data.job;
+  const startGeneration = useCallback(async (candidate: WikipediaCandidate) => {
+    setSelectedCandidate(candidate);
+    setCandidates([]);
+    setJobError(null);
+    setJobProgress(10);
+    setJobMessage("Initializing mission generator...");
 
-        setJobProgress(job.progressPercent || 25);
-        setJobMessage(job.message || "Synthesizing content...");
+    try {
+      const res = await fetch("/api/content/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageId: candidate.pageId,
+          title: candidate.title,
+        }),
+      });
 
-        if (job.status === "completed" && job.contentId) {
-          clearInterval(interval);
-          setTimeout(() => {
-            router.push(`/quiz/${job.contentId}`);
-          }, 800);
-        } else if (job.status === "failed") {
-          clearInterval(interval);
-          setJobError(job.error || "Generation failed.");
-          setActiveJobId(null);
-        }
-      } catch (err) {
-        console.error("Poll error:", err);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Generation request failed");
+
+      if (data.cached && data.contentId) {
+        // Cached quiz immediately ready
+        setJobProgress(100);
+        setJobMessage("Archive match found! Entering arena...");
+        setTimeout(() => {
+          router.push(`/quiz/${data.contentId}`);
+        }, 600);
+        return;
       }
-    }, 1500);
+
+      // Track async job via SSE or polling
+      setActiveJobId(data.jobId);
+      listenToJob(data.jobId);
+    } catch (err: any) {
+      setJobError(err.message || "Failed to initiate generation");
+      setActiveJobId(null);
+    }
+  }, [router, listenToJob]);
+
+  const executeResolve = useCallback(async (searchTerm: string) => {
+    if (!searchTerm.trim()) return;
+
+    setIsResolving(true);
+    setCandidates([]);
+    setSelectedCandidate(null);
+    setJobError(null);
+
+    try {
+      const res = await fetch("/api/topic/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchTerm.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Search failed");
+
+      if (!data.candidates || data.candidates.length === 0) {
+        setJobError("No matching historical records found. Try another topic!");
+        setIsResolving(false);
+        return;
+      }
+
+      if (data.candidates.length === 1) {
+        // Direct match, start generation immediately
+        startGeneration(data.candidates[0]);
+      } else {
+        // Disambiguation needed
+        setCandidates(data.candidates);
+      }
+    } catch (err: any) {
+      setJobError(err.message || "Failed to resolve topic.");
+    } finally {
+      setIsResolving(false);
+    }
+  }, [startGeneration]);
+
+  // If query parameter is provided on mount (e.g. from follow-up topic chips), auto-trigger search
+  useEffect(() => {
+    if (queryParam && queryParam.trim().length > 0) {
+      setQuery(queryParam);
+      executeResolve(queryParam);
+    }
+  }, [queryParam, executeResolve]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim() || isResolving) return;
+    executeResolve(query);
   };
 
   return (
@@ -341,5 +356,19 @@ export default function HomePage() {
         </section>
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-game-blue animate-spin" />
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

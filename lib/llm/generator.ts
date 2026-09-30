@@ -190,7 +190,7 @@ function generateOfflineQuizContent(topicTitle: string, wikipediaExtract: string
       explanation: `Historical record: "${sentence}"`,
       fact_id: fact.id,
       difficulty,
-      isDateRecall: false,
+      is_date_recall: false,
     };
   });
 

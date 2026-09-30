@@ -36,3 +36,6 @@ yarn-error.log*
 # system
 .DS_Store
 Thumbs.db
+
+# evals runtime output
+evals/output/

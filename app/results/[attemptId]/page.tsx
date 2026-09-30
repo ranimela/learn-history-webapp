@@ -15,6 +15,7 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react";
+import { soundFX } from "@/lib/audio";
 
 interface FinalResults {
   attemptId: string;
@@ -72,6 +73,7 @@ export default function ResultsPage() {
 
         const json = await res.json();
         setData(json);
+        soundFX.playVictory();
       } catch (err: any) {
         setError(err.message || "An error occurred");
       } finally {

@@ -1,0 +1,22 @@
+[
+  { "id": "1", "name": "Julius Caesar", "era": "Ancient Rome" },
+  { "id": "2", "name": "Alexander the Great", "era": "Ancient Greece" },
+  { "id": "3", "name": "Cleopatra", "era": "Ptolemaic Egypt" },
+  { "id": "4", "name": "Qin Shi Huang", "era": "Ancient China" },
+  { "id": "5", "name": "Charlemagne", "era": "Early Medieval Europe" },
+  { "id": "6", "name": "Saladin", "era": "Medieval Middle East" },
+  { "id": "7", "name": "Genghis Khan", "era": "Mongol Empire" },
+  { "id": "8", "name": "Battle of Hastings", "era": "Medieval Britain" },
+  { "id": "9", "name": "Oda Nobunaga", "era": "Sengoku Japan" },
+  { "id": "10", "name": "Leonardo da Vinci", "era": "Italian Renaissance" },
+  { "id": "11", "name": "House of Bourbon", "era": "Early Modern France" },
+  { "id": "12", "name": "Ferdinand Magellan", "era": "Age of Exploration" },
+  { "id": "13", "name": "Isaac Newton", "era": "Scientific Revolution" },
+  { "id": "14", "name": "George Washington", "era": "American Revolution" },
+  { "id": "15", "name": "Maximilien Robespierre", "era": "French Revolution" },
+  { "id": "16", "name": "Battle of Waterloo", "era": "Napoleonic Wars" },
+  { "id": "17", "name": "Abraham Lincoln", "era": "American Civil War" },
+  { "id": "18", "name": "Battle of the Somme", "era": "World War I" },
+  { "id": "19", "name": "Winston Churchill", "era": "World War II" },
+  { "id": "20", "name": "Apollo 11", "era": "Space Age" }
+]

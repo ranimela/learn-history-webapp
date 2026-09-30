@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, Flame, Award, ShieldAlert } from "lucide-react";
+import { Zap, Flame, Award, ShieldAlert, Volume2, VolumeX } from "lucide-react";
+import { soundFX } from "@/lib/audio";
 
 interface LearnerData {
   totalXp: number;
@@ -15,6 +16,19 @@ interface LearnerData {
 
 export const Navbar = () => {
   const [data, setData] = useState<LearnerData | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    setMuted(soundFX.isMuted());
+  }, []);
+
+  const handleToggleSound = () => {
+    const isNowSoundEnabled = soundFX.toggleMute();
+    setMuted(!isNowSoundEnabled);
+    if (isNowSoundEnabled) {
+      soundFX.playClick();
+    }
+  };
 
   const fetchHUD = async () => {
     try {
@@ -98,6 +112,20 @@ export const Navbar = () => {
             </div>
           </div>
         )}
+
+        {/* Global Sound FX Toggle */}
+        <button
+          onClick={handleToggleSound}
+          title={muted ? "Unmute Sound Effects" : "Mute Sound Effects"}
+          className="p-2.5 rounded-xl bg-game-surfaceLight border border-game-border hover:border-game-purple text-slate-300 hover:text-white transition-colors flex items-center justify-center shadow-sm"
+          aria-label={muted ? "Unmute Sound Effects" : "Mute Sound Effects"}
+        >
+          {muted ? (
+            <VolumeX className="w-5 h-5 text-slate-500" />
+          ) : (
+            <Volume2 className="w-5 h-5 text-game-yellow" />
+          )}
+        </button>
       </div>
     </header>
   );
