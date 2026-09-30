@@ -19,6 +19,7 @@ export const contents = sqliteTable("contents", {
     .notNull()
     .references(() => topics.id, { onDelete: "cascade" }),
   lessonText: text("lesson_text").notNull(),
+  difficulty: integer("difficulty").notNull().default(2),
   factsJson: text("facts_json").notNull(), // JSON string: Array<{ id: string, verbatim_quote: string, fact_statement: string }>
   followupsJson: text("followups_json"), // JSON string: string[]
   sourceUrl: text("source_url").notNull(),

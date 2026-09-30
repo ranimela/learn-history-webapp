@@ -78,6 +78,12 @@ export async function ensureTablesExist(): Promise<void> {
     // Ignore if column already exists
   }
 
+  try {
+    await client.execute(`ALTER TABLE contents ADD COLUMN difficulty INTEGER NOT NULL DEFAULT 2;`);
+  } catch {
+    // Ignore if column already exists
+  }
+
   await client.execute(`
     CREATE TABLE IF NOT EXISTS answers (
       id TEXT PRIMARY KEY,

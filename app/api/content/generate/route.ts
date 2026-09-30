@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureTablesExist } from "@/lib/db/client";
 import { topics, contents, questions, generationJobs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { GenerateContentRequestSchema } from "@/lib/schemas";
 import { fetchWikipediaExtract } from "@/lib/wikipedia";
 import { generateQuizContent } from "@/lib/llm/generator";
@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request parameters" }, { status: 400 });
     }
 
-    const { pageId, title, difficulty = 3, refresh = false } = parsed.data;
+    const { pageId, title, difficulty = 2, refresh = false } = parsed.data;
 
-    // Check if content already generated and cached for this Wikipedia page (unless refresh is requested)
+    // Check if content already generated and cached for this Wikipedia page at THIS difficulty level
     if (!refresh) {
       const existingTopic = await db
         .select()
@@ -28,14 +28,15 @@ export async function POST(req: NextRequest) {
         .get();
 
       if (existingTopic) {
+        // Find content for this topic specifically with matching difficulty
         const existingContent = await db
           .select()
           .from(contents)
-          .where(eq(contents.topicId, existingTopic.id))
+          .where(and(eq(contents.topicId, existingTopic.id), eq(contents.difficulty, difficulty)))
           .get();
 
         if (existingContent) {
-          // Check if existing content has enough questions matching the requested difficulty
+          // Verify that this content has at least 8 questions matching the difficulty
           const allPoolQuestions = await db
             .select()
             .from(questions)
@@ -148,23 +149,37 @@ async function executeGenerationPipeline(
     }
 
     // 4. Persistence into database
-    const topicId = `top_${crypto.randomUUID()}`;
+    let existingTopic = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.wikiPageId, pageId))
+      .get();
+
+    let topicId = existingTopic?.id;
+    if (!topicId) {
+      topicId = `top_${crypto.randomUUID()}`;
+      await db.insert(topics).values({
+        id: topicId,
+        learnerId: 1,
+        name: title,
+        wikiTitle: extract.title,
+        wikiPageId: pageId,
+        lastStudiedAt: new Date().toISOString(),
+      });
+    } else {
+      await db
+        .update(topics)
+        .set({ lastStudiedAt: new Date().toISOString() })
+        .where(eq(topics.id, topicId));
+    }
+
     const contentId = `cnt_${crypto.randomUUID()}`;
 
-    // Insert topic
-    await db.insert(topics).values({
-      id: topicId,
-      learnerId: 1,
-      name: title,
-      wikiTitle: extract.title,
-      wikiPageId: pageId,
-      lastStudiedAt: new Date().toISOString(),
-    });
-
-    // Insert content
+    // Insert content tagged with its specific difficulty level
     await db.insert(contents).values({
       id: contentId,
       topicId,
+      difficulty,
       lessonText: generated.lesson_text,
       factsJson: JSON.stringify(validation.validFacts),
       followupsJson: JSON.stringify(generated.followups),

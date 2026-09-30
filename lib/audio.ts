@@ -298,6 +298,77 @@ class SoundEffects {
       // Ignore
     }
   }
+
+  public playMildTune() {
+    if (!this.soundEnabled) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      // Mild, neutral, soft 3-note chime (G3 -> Bb3 -> C4) for score 3-5
+      const notes = [
+        { freq: 196.0, start: 0.0, dur: 0.25 },
+        { freq: 233.08, start: 0.2, dur: 0.25 },
+        { freq: 261.63, start: 0.4, dur: 0.5 },
+      ];
+
+      notes.forEach(({ freq, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + start);
+
+        gain.gain.setValueAtTime(0.12, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now + start);
+        osc.stop(now + start + dur + 0.05);
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
+  public playUpbeatTune() {
+    if (!this.soundEnabled) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      // Upbeat, motivating 4-note ascending chime (G4 -> C5 -> E5 -> G5) for score 6-8
+      const notes = [
+        { freq: 392.0, start: 0.0, dur: 0.16 },
+        { freq: 523.25, start: 0.14, dur: 0.16 },
+        { freq: 659.25, start: 0.28, dur: 0.2 },
+        { freq: 783.99, start: 0.45, dur: 0.5 },
+      ];
+
+      notes.forEach(({ freq, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, now + start);
+
+        gain.gain.setValueAtTime(0.16, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now + start);
+        osc.stop(now + start + dur + 0.05);
+      });
+    } catch {
+      // Ignore
+    }
+  }
 }
 
 export const soundFX = new SoundEffects();

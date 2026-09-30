@@ -79,29 +79,32 @@ export default function ResultsPage() {
           soundFX.playTrumpets();
           // Confetti cannons!
           confetti({
-            particleCount: 90,
+            particleCount: 100,
             spread: 70,
             origin: { y: 0.6 },
             colors: ["#ffd700", "#ff007f", "#00f0ff", "#39ff14", "#ffffff"],
           });
           setTimeout(() => {
             confetti({
-              particleCount: 70,
+              particleCount: 75,
               angle: 60,
               spread: 60,
               origin: { x: 0 },
             });
             confetti({
-              particleCount: 70,
+              particleCount: 75,
               angle: 120,
               spread: 60,
               origin: { x: 1 },
             });
           }, 350);
-        } else if (json.score <= 2) {
-          soundFX.playSadTune();
+        } else if (json.score >= 6) {
+          soundFX.playUpbeatTune();
+        } else if (json.score >= 3) {
+          soundFX.playMildTune();
         } else {
-          soundFX.playVictory();
+          // 0 - 2
+          soundFX.playSadTune();
         }
       } catch (err: any) {
         setError(err.message || "An error occurred");
@@ -145,60 +148,87 @@ export default function ResultsPage() {
     );
   }
 
-  const isHighScorer = data.score >= 9;
-  const isLoser = data.score <= 2;
   const isPerfect = data.score === data.totalQuestions;
+
+  // Exact feedback texts requested by user:
+  // 0-2: Loser...
+  // 3-5: not good enough, but ok
+  // 6-8: You're getting there
+  // 9-10: Champ!
+  let feedbackText = "";
+  let feedbackColor = "";
+  let feedbackBadge = "";
+  let feedbackBadgeStyle = "";
+
+  if (data.score <= 2) {
+    feedbackText = "Loser...";
+    feedbackColor = "text-game-red";
+    feedbackBadge = "TOTAL DEFEAT";
+    feedbackBadgeStyle = "bg-game-red/20 border-game-red/60 text-red-400";
+  } else if (data.score <= 5) {
+    feedbackText = "not good enough, but ok";
+    feedbackColor = "text-amber-400";
+    feedbackBadge = "PROGRESS";
+    feedbackBadgeStyle = "bg-amber-500/20 border-amber-500/60 text-amber-300";
+  } else if (data.score <= 8) {
+    feedbackText = "You're getting there";
+    feedbackColor = "text-game-blue";
+    feedbackBadge = "WELL PLAYED";
+    feedbackBadgeStyle = "bg-game-blue/20 border-game-blue/60 text-cyan-300";
+  } else {
+    // 9 - 10
+    feedbackText = "Champ!";
+    feedbackColor = "text-game-yellow";
+    feedbackBadge = isPerfect ? "PERFECT VICTORY ROYALE!" : "CHAMPION VICTORY!";
+    feedbackBadgeStyle = "bg-game-yellow/20 border-game-yellow/60 text-game-yellow";
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-10 pb-20">
       {/* Victory / Defeat Banner */}
       <section
         className={`relative overflow-hidden rounded-3xl border-2 p-8 sm:p-12 text-center transition-all ${
-          isHighScorer
+          data.score >= 9
             ? "bg-gradient-to-br from-[#1c183b] via-game-surface to-[#0e172e] border-game-yellow/70 shadow-glow-yellow"
-            : isLoser
+            : data.score <= 2
             ? "bg-gradient-to-br from-[#2a0e14] via-game-surface to-[#14080b] border-game-red/70 shadow-glow-red"
-            : "bg-gradient-to-br from-[#171433] via-game-surface to-[#0e172e] border-game-purple/50"
+            : data.score <= 5
+            ? "bg-gradient-to-br from-[#241a12] via-game-surface to-[#141224] border-amber-500/50"
+            : "bg-gradient-to-br from-[#121c2e] via-game-surface to-[#0e172e] border-game-blue/50"
         }`}
       >
-        {isHighScorer ? (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-yellow/20 border border-game-yellow/50 text-game-yellow font-heading text-sm uppercase tracking-widest mb-4">
+        <div
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs sm:text-sm font-heading uppercase tracking-widest mb-4 ${feedbackBadgeStyle}`}
+        >
+          {data.score >= 9 ? (
             <Trophy className="w-4 h-4 text-game-yellow" />
-            {isPerfect ? "PERFECT VICTORY ROYALE!" : "LEGENDARY VICTORY ROYALE!"}
-          </div>
-        ) : isLoser ? (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-red/20 border border-game-red/60 text-red-400 font-heading text-sm uppercase tracking-widest mb-4">
+          ) : data.score <= 2 ? (
             <XCircle className="w-4 h-4 text-game-red" />
-            TOTAL DEFEAT
-          </div>
-        ) : (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-blue/20 border border-game-blue/50 text-game-blue font-heading text-sm uppercase tracking-widest mb-4">
-            <Award className="w-4 h-4 text-game-blue" />
-            MISSION ACCOMPLISHED!
-          </div>
-        )}
+          ) : (
+            <Award className="w-4 h-4" />
+          )}
+          {feedbackBadge}
+        </div>
 
-        <h1 className="font-heading text-4xl sm:text-6xl text-white uppercase italic tracking-wider mb-2">
+        <h1 className="font-heading text-3xl sm:text-5xl text-white uppercase italic tracking-wider mb-2">
           {data.topicTitle}
         </h1>
 
-        {isLoser && (
-          <div className="text-3xl sm:text-5xl font-heading font-black text-game-red uppercase tracking-wider my-3 animate-bounce">
-            YOU&apos;RE A LOSER
-          </div>
-        )}
+        <div
+          className={`text-4xl sm:text-6xl font-heading font-black uppercase tracking-wider my-4 ${feedbackColor} ${
+            data.score <= 2
+              ? "animate-bounce"
+              : data.score >= 9
+              ? "animate-pulse text-shadow-yellow"
+              : ""
+          }`}
+        >
+          {feedbackText}
+        </div>
 
         <div className="text-slate-300 text-lg font-semibold mb-8">
           FINAL SCORE:{" "}
-          <span
-            className={`font-heading text-2xl ${
-              isHighScorer
-                ? "text-game-yellow"
-                : isLoser
-                ? "text-game-red"
-                : "text-game-blue"
-            }`}
-          >
+          <span className={`font-heading text-3xl ${feedbackColor}`}>
             {data.score}
           </span>{" "}
           / {data.totalQuestions}

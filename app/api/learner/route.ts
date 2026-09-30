@@ -40,6 +40,7 @@ export async function GET(_req: NextRequest) {
         id: topics.id,
         name: topics.name,
         wikiTitle: topics.wikiTitle,
+        wikiPageId: topics.wikiPageId,
         lastStudiedAt: topics.lastStudiedAt,
         contentId: contents.id,
       })
@@ -55,6 +56,7 @@ export async function GET(_req: NextRequest) {
         attemptId: attempts.id,
         contentId: attempts.contentId,
         topicName: topics.name,
+        wikiPageId: topics.wikiPageId,
         score: attempts.score,
         nQuestions: attempts.nQuestions,
         difficulty: attempts.difficulty,

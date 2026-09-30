@@ -23,6 +23,7 @@ interface RecentTopic {
   id: string;
   name: string;
   wikiTitle: string;
+  wikiPageId?: number;
   lastStudiedAt: string;
   contentId: string;
 }
@@ -31,6 +32,7 @@ interface BattleLogEntry {
   attemptId: string;
   contentId: string;
   topicName: string;
+  wikiPageId?: number;
   score: number;
   nQuestions: number;
   difficulty: number;
@@ -233,6 +235,14 @@ function HomeContent() {
     e.preventDefault();
     if (!query.trim() || isResolving) return;
     executeResolve(query);
+  };
+
+  const handleEnterTopic = (pageId?: number, title?: string) => {
+    if (pageId && title) {
+      startGeneration({ pageId, title, description: title });
+    } else if (title) {
+      executeResolve(title);
+    }
   };
 
   const getDifficultyMeta = (level: number) => {
@@ -563,9 +573,7 @@ function HomeContent() {
                         VIEW DEBRIEF
                       </button>
                       <button
-                        onClick={() =>
-                          router.push(`/quiz/${battle.contentId}?difficulty=${difficulty}`)
-                        }
+                        onClick={() => handleEnterTopic(battle.wikiPageId, battle.topicName)}
                         className="tactile-btn px-3 py-1.5 bg-game-purple hover:bg-game-purple-dark text-white rounded-lg font-heading text-xs uppercase tracking-wider flex items-center gap-1"
                       >
                         <RotateCcw className="w-3 h-3" /> REMATCH
@@ -614,9 +622,7 @@ function HomeContent() {
                       Instant Replay
                     </span>
                     <button
-                      onClick={() =>
-                        router.push(`/quiz/${topic.contentId}?difficulty=${difficulty}`)
-                      }
+                      onClick={() => handleEnterTopic(topic.wikiPageId, topic.name)}
                       className="tactile-btn px-4 py-2 bg-game-purple hover:bg-game-purple-dark text-white rounded-lg font-heading text-sm uppercase tracking-wider flex items-center gap-1.5"
                     >
                       ENTER <ArrowRight className="w-3.5 h-3.5" />
