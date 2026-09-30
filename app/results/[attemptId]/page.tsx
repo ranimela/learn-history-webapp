@@ -16,6 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
+import confetti from "canvas-confetti";
 
 interface FinalResults {
   attemptId: string;
@@ -73,7 +74,35 @@ export default function ResultsPage() {
 
         const json = await res.json();
         setData(json);
-        soundFX.playVictory();
+
+        if (json.score >= 9) {
+          soundFX.playTrumpets();
+          // Confetti cannons!
+          confetti({
+            particleCount: 90,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ["#ffd700", "#ff007f", "#00f0ff", "#39ff14", "#ffffff"],
+          });
+          setTimeout(() => {
+            confetti({
+              particleCount: 70,
+              angle: 60,
+              spread: 60,
+              origin: { x: 0 },
+            });
+            confetti({
+              particleCount: 70,
+              angle: 120,
+              spread: 60,
+              origin: { x: 1 },
+            });
+          }, 350);
+        } else if (json.score <= 2) {
+          soundFX.playSadTune();
+        } else {
+          soundFX.playVictory();
+        }
       } catch (err: any) {
         setError(err.message || "An error occurred");
       } finally {
@@ -116,22 +145,63 @@ export default function ResultsPage() {
     );
   }
 
+  const isHighScorer = data.score >= 9;
+  const isLoser = data.score <= 2;
   const isPerfect = data.score === data.totalQuestions;
 
   return (
     <div className="max-w-4xl mx-auto space-y-10 pb-20">
-      {/* Victory Banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1c183b] via-game-surface to-[#0e172e] border-2 border-game-yellow/60 p-8 sm:p-12 text-center shadow-glow-yellow">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-yellow/20 border border-game-yellow/50 text-game-yellow font-heading text-sm uppercase tracking-widest mb-4">
-          <Trophy className="w-4 h-4" />
-          {isPerfect ? "PERFECT VICTORY ROYALE!" : "MISSION ACCOMPLISHED!"}
-        </div>
+      {/* Victory / Defeat Banner */}
+      <section
+        className={`relative overflow-hidden rounded-3xl border-2 p-8 sm:p-12 text-center transition-all ${
+          isHighScorer
+            ? "bg-gradient-to-br from-[#1c183b] via-game-surface to-[#0e172e] border-game-yellow/70 shadow-glow-yellow"
+            : isLoser
+            ? "bg-gradient-to-br from-[#2a0e14] via-game-surface to-[#14080b] border-game-red/70 shadow-glow-red"
+            : "bg-gradient-to-br from-[#171433] via-game-surface to-[#0e172e] border-game-purple/50"
+        }`}
+      >
+        {isHighScorer ? (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-yellow/20 border border-game-yellow/50 text-game-yellow font-heading text-sm uppercase tracking-widest mb-4">
+            <Trophy className="w-4 h-4 text-game-yellow" />
+            {isPerfect ? "PERFECT VICTORY ROYALE!" : "LEGENDARY VICTORY ROYALE!"}
+          </div>
+        ) : isLoser ? (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-red/20 border border-game-red/60 text-red-400 font-heading text-sm uppercase tracking-widest mb-4">
+            <XCircle className="w-4 h-4 text-game-red" />
+            TOTAL DEFEAT
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-game-blue/20 border border-game-blue/50 text-game-blue font-heading text-sm uppercase tracking-widest mb-4">
+            <Award className="w-4 h-4 text-game-blue" />
+            MISSION ACCOMPLISHED!
+          </div>
+        )}
 
         <h1 className="font-heading text-4xl sm:text-6xl text-white uppercase italic tracking-wider mb-2">
           {data.topicTitle}
         </h1>
+
+        {isLoser && (
+          <div className="text-3xl sm:text-5xl font-heading font-black text-game-red uppercase tracking-wider my-3 animate-bounce">
+            YOU&apos;RE A LOSER
+          </div>
+        )}
+
         <div className="text-slate-300 text-lg font-semibold mb-8">
-          FINAL SCORE: <span className="text-game-yellow font-heading text-2xl">{data.score}</span> / {data.totalQuestions}
+          FINAL SCORE:{" "}
+          <span
+            className={`font-heading text-2xl ${
+              isHighScorer
+                ? "text-game-yellow"
+                : isLoser
+                ? "text-game-red"
+                : "text-game-blue"
+            }`}
+          >
+            {data.score}
+          </span>{" "}
+          / {data.totalQuestions}
         </div>
 
         {/* XP Gains Grid */}

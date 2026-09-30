@@ -35,10 +35,25 @@ export async function POST(req: NextRequest) {
           .get();
 
         if (existingContent) {
-          return NextResponse.json({
-            contentId: existingContent.id,
-            cached: true,
+          // Check if existing content has enough questions matching the requested difficulty
+          const allPoolQuestions = await db
+            .select()
+            .from(questions)
+            .where(eq(questions.contentId, existingContent.id))
+            .all();
+
+          const matchingQuestions = allPoolQuestions.filter((q) => {
+            if (difficulty === 1) return q.difficulty <= 2;
+            if (difficulty === 3) return q.difficulty >= 4;
+            return q.difficulty >= 2 && q.difficulty <= 3;
           });
+
+          if (matchingQuestions.length >= 8) {
+            return NextResponse.json({
+              contentId: existingContent.id,
+              cached: true,
+            });
+          }
         }
       }
     } else {

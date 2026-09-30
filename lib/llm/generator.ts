@@ -13,9 +13,40 @@ export async function generateQuizContent(
 
   const model = getLanguageModel();
 
+  const normalizedDiff = Math.min(3, Math.max(1, Math.round(difficultyTarget)));
+
+  let difficultyProfilePrompt = "";
+  if (normalizedDiff === 1) {
+    difficultyProfilePrompt = `
+TARGET DIFFICULTY TIER: LEVEL 1 (RECRUIT / EASY)
+- Target audience: 11-year-old beginner history enthusiast.
+- Ask questions about the MOST FAMOUS, ICONIC, and FOUNDATIONAL facts about "${topicTitle}".
+  * E.g. What nation or empire they led; their primary famous title; what major conflict or victory made them world-famous; where they lived; their most legendary allies or rivals.
+  * DO NOT ask about minor administrative dates, obscure minor officials, or subtle bureaucratic disputes.
+- Stems must be short, clear, and direct (10 to 16 words).
+- Distractors must be clearly distinct, recognizable alternatives from world history/the era.
+- In your output JSON, set "difficulty": 1 or 2 for ALL questions.`;
+  } else if (normalizedDiff === 3) {
+    difficultyProfilePrompt = `
+TARGET DIFFICULTY TIER: LEVEL 3 (LEGEND / EXPERT CHALLENGE)
+- Target audience: 11-year-old history whiz who already knows all the basics and demands an authentic challenge.
+- Ask about complex causes and consequences, tactical battle decisions, specific legal reforms, treaties, and chronological turning points.
+- Stems must challenge historical reasoning (12 to 20 words).
+- Distractors must be authentic, highly plausible alternatives from the exact same historical era.
+- In your output JSON, set "difficulty": 4 or 5 for ALL questions.`;
+  } else {
+    difficultyProfilePrompt = `
+TARGET DIFFICULTY TIER: LEVEL 2 (VETERAN / STANDARD)
+- Target audience: 11-year-old with solid historical knowledge.
+- Balanced questions examining major turning points, leadership reforms, motivations, and strategic alliances.
+- In your output JSON, set "difficulty": 2 or 3 for ALL questions.`;
+  }
+
   const systemPrompt = `
 You are an expert history educator crafting a dynamic 10-question quiz and lesson for a sharp 11-year-old history enthusiast.
 Target reading level: upper elementary to middle school (engaging, challenging, clear, never babyish).
+
+${difficultyProfilePrompt}
 
 PEDAGOGICAL & GROUNDING REQUIREMENTS:
 1. GROUNDING: Use ONLY facts explicitly written in the provided Wikipedia extract. Never inject ungrounded or outside facts.
@@ -23,27 +54,26 @@ PEDAGOGICAL & GROUNDING REQUIREMENTS:
    - NEVER ask vague questions like "During which century did this key milestone occur?" without specifying WHICH milestone.
    - If the subject is a person, ask what they did or what happened to them; NEVER ask "who played an instrumental role in [Person's name]?".
 3. BALANCED, CONCISE OPTIONS (NO GIVEAWAYS):
-   - All 4 options must be similar in length (between 3 and 10 words each).
+   - All 4 options must be similar in length (between 2 and 9 words each).
    - NEVER make the correct option 30 words while distractors are 3 words.
    - Do NOT give the answer away by repeating the same unique keywords from the stem in only the correct answer.
-   - Distractors must be plausible, historically authentic alternatives from the same era/context.
+   - Distractors must be plausible, historically authentic alternatives from the era/context.
 4. NO ELLIPSES OR TRUNCATION: Every stem and option must be a complete, well-formed sentence or phrase.
 5. NO REPEATED QUESTIONS: Every question must cover a completely different event, decision, battle, reform, or turning point.
-6. DIFFICULTY DISTRIBUTION: 20% level 2, 40% level 3, 30% level 4, 10% level 5.
-7. SPREAD CORRECT ANSWERS: Evenly distribute correct indices across 0, 1, 2, and 3.
-8. LESSON BRIEF: A compelling, narrative 250-400 word lesson covering the major story arcs, ending with an inspiring transition to follow-up topics.
+6. SPREAD CORRECT ANSWERS: Evenly distribute correct indices across 0, 1, 2, and 3.
+7. LESSON BRIEF: A compelling, narrative 250-400 word lesson covering the major story arcs, ending with an inspiring transition to follow-up topics.
 `;
 
   const userPrompt = `
 HISTORICAL TOPIC: ${topicTitle}
-DIFFICULTY TARGET (1-5): ${difficultyTarget}
+REQUESTED DIFFICULTY: LEVEL ${normalizedDiff} (1=Easy/Recruit, 2=Medium/Veteran, 3=Hard/Legend)
 
 SOURCE EXTRACT:
 ${wikipediaExtract}
 
 Generate:
 - 12 to 20 grounded facts with verbatim quotes from the text.
-- 15 high-quality multiple choice questions matching all conciseness, balance, and grounding rules.
+- 15 high-quality multiple choice questions strictly matching the LEVEL ${normalizedDiff} difficulty profile and all conciseness and grounding rules.
 - A 250-400 word lesson text.
 - 2 to 4 recommended follow-up topic titles.
 `;

@@ -39,9 +39,11 @@ export async function GET(
     const diffParam = searchParams.get("difficulty");
     const diffLevel = diffParam ? parseInt(diffParam, 10) : 2;
 
-    // Sort questions by proximity to chosen difficulty level
-    // Level 1 (Recruit) -> ~2, Level 2 (Veteran) -> ~3, Level 3 (Legend) -> ~4.5
-    const targetDiff = diffLevel === 1 ? 2 : diffLevel === 3 ? 4.5 : 3;
+    // Strictly prioritize questions matching difficulty:
+    // Level 1 (Recruit) -> 1.0 (strongly prefers level 1 and 2)
+    // Level 2 (Veteran) -> 3.0 (prefers level 3, then 2/4)
+    // Level 3 (Legend)  -> 5.0 (strongly prefers level 4 and 5)
+    const targetDiff = diffLevel === 1 ? 1.0 : diffLevel === 3 ? 5.0 : 3.0;
     const sortedQuestions = [...allQuestions].sort((a, b) => {
       return Math.abs(a.difficulty - targetDiff) - Math.abs(b.difficulty - targetDiff);
     });
