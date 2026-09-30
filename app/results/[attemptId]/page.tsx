@@ -155,6 +155,17 @@ export default function ResultsPage() {
         </div>
       </section>
 
+      {/* Primary Action: Start New Battle Immediately Following Results */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-2">
+        <button
+          onClick={() => router.push("/")}
+          className="tactile-btn gamer-cut w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-game-yellow via-amber-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-game-bg font-heading text-xl font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-glow-yellow"
+        >
+          <RotateCcw className="w-5 h-5 stroke-[2.5]" />
+          START NEW BATTLE
+        </button>
+      </div>
+
       {/* Lesson Brief Section */}
       <section className="bg-game-surface border-2 border-game-border rounded-3xl p-6 sm:p-10 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-game-border pb-4">

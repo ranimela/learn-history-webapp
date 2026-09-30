@@ -35,8 +35,19 @@ export async function GET(
       return NextResponse.json({ error: "No active questions available for this quiz" }, { status: 400 });
     }
 
+    const { searchParams } = new URL(_req.url);
+    const diffParam = searchParams.get("difficulty");
+    const diffLevel = diffParam ? parseInt(diffParam, 10) : 2;
+
+    // Sort questions by proximity to chosen difficulty level
+    // Level 1 (Recruit) -> ~2, Level 2 (Veteran) -> ~3, Level 3 (Legend) -> ~4.5
+    const targetDiff = diffLevel === 1 ? 2 : diffLevel === 3 ? 4.5 : 3;
+    const sortedQuestions = [...allQuestions].sort((a, b) => {
+      return Math.abs(a.difficulty - targetDiff) - Math.abs(b.difficulty - targetDiff);
+    });
+
     // Select up to 10 questions from pool
-    const selectedQuestions = allQuestions.slice(0, 10);
+    const selectedQuestions = sortedQuestions.slice(0, 10);
 
     // ANTI-CHEAT SANITIZATION:
     // Strip correctIdx, explanation, and factId completely

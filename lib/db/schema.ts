@@ -58,6 +58,7 @@ export const attempts = sqliteTable("attempts", {
   finishedAt: text("finished_at"),
   score: integer("score").notNull().default(0),
   nQuestions: integer("n_questions").notNull().default(10),
+  difficulty: integer("difficulty").notNull().default(2),
   totalXpEarned: integer("total_xp_earned").notNull().default(0),
 });
 

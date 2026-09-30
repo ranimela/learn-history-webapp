@@ -4,7 +4,7 @@ import { attempts } from "@/lib/db/schema";
 
 export async function POST(req: NextRequest) {
   try {
-    const { contentId, nQuestions = 10 } = await req.json();
+    const { contentId, nQuestions = 10, difficulty = 2 } = await req.json();
 
     if (!contentId) {
       return NextResponse.json({ error: "contentId is required" }, { status: 400 });
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       learnerId: 1,
       contentId,
       nQuestions,
+      difficulty: Number(difficulty) || 2,
       startedAt: new Date().toISOString(),
       score: 0,
       totalXpEarned: 0,

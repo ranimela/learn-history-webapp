@@ -2,8 +2,22 @@
 
 import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Compass, Swords, ArrowRight, Loader2, Sparkles, BookOpen } from "lucide-react";
+import {
+  Search,
+  Compass,
+  Swords,
+  ArrowRight,
+  Loader2,
+  Sparkles,
+  BookOpen,
+  Shield,
+  History,
+  Trophy,
+  Clock,
+  RotateCcw,
+} from "lucide-react";
 import { WikipediaCandidate } from "@/lib/schemas";
+import { soundFX } from "@/lib/audio";
 
 interface RecentTopic {
   id: string;
@@ -13,12 +27,24 @@ interface RecentTopic {
   contentId: string;
 }
 
+interface BattleLogEntry {
+  attemptId: string;
+  contentId: string;
+  topicName: string;
+  score: number;
+  nQuestions: number;
+  difficulty: number;
+  totalXpEarned: number;
+  finishedAt: string;
+}
+
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryParam = searchParams.get("q") || "";
 
   const [query, setQuery] = useState(queryParam);
+  const [difficulty, setDifficulty] = useState<number>(2); // 1 = Recruit, 2 = Veteran, 3 = Legend
   const [isResolving, setIsResolving] = useState(false);
   const [candidates, setCandidates] = useState<WikipediaCandidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<WikipediaCandidate | null>(null);
@@ -29,156 +55,173 @@ function HomeContent() {
   const [jobMessage, setJobMessage] = useState("");
   const [jobError, setJobError] = useState<string | null>(null);
 
-  // Recent topics
+  // Recent topics & Combat Log
   const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([]);
+  const [battleLog, setBattleLog] = useState<BattleLogEntry[]>([]);
 
-  useEffect(() => {
+  const loadLearnerData = useCallback(() => {
     fetch("/api/learner")
       .then((res) => res.json())
       .then((data) => {
         if (data.recentTopics) {
           setRecentTopics(data.recentTopics);
         }
+        if (data.battleLog) {
+          setBattleLog(data.battleLog);
+        }
       })
-      .catch((err) => console.error("Failed to load recent topics:", err));
+      .catch((err) => console.error("Failed to load learner history:", err));
   }, []);
 
-  const pollJob = useCallback((jobId: string) => {
-    const interval = setInterval(async () => {
+  useEffect(() => {
+    loadLearnerData();
+  }, [loadLearnerData]);
+
+  const pollJob = useCallback(
+    (jobId: string) => {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/jobs/${jobId}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const job = data.job;
+
+          setJobProgress(job.progressPercent || 25);
+          setJobMessage(job.message || "Synthesizing content...");
+
+          if (job.status === "completed" && job.contentId) {
+            clearInterval(interval);
+            setTimeout(() => {
+              router.push(`/quiz/${job.contentId}?difficulty=${difficulty}`);
+            }, 800);
+          } else if (job.status === "failed") {
+            clearInterval(interval);
+            setJobError(job.error || "Generation failed.");
+            setActiveJobId(null);
+          }
+        } catch (err) {
+          console.error("Poll error:", err);
+        }
+      }, 1500);
+    },
+    [router, difficulty]
+  );
+
+  const listenToJob = useCallback(
+    (jobId: string) => {
+      const eventSource = new EventSource(`/api/jobs/${jobId}/stream`);
+
+      eventSource.addEventListener("update", (e) => {
+        try {
+          const job = JSON.parse(e.data);
+          setJobProgress(job.progressPercent || 20);
+          setJobMessage(job.message || "Processing...");
+
+          if (job.status === "completed" && job.contentId) {
+            eventSource.close();
+            setTimeout(() => {
+              router.push(`/quiz/${job.contentId}?difficulty=${difficulty}`);
+            }, 800);
+          } else if (job.status === "failed") {
+            eventSource.close();
+            setJobError(job.error || "Generation encountered an error.");
+            setActiveJobId(null);
+          }
+        } catch (err) {
+          console.error("SSE parse error:", err);
+        }
+      });
+
+      eventSource.addEventListener("error", () => {
+        eventSource.close();
+        pollJob(jobId);
+      });
+    },
+    [router, pollJob, difficulty]
+  );
+
+  const startGeneration = useCallback(
+    async (candidate: WikipediaCandidate) => {
+      setSelectedCandidate(candidate);
+      setCandidates([]);
+      setJobError(null);
+      setJobProgress(10);
+      setJobMessage("Initializing mission generator...");
+
       try {
-        const res = await fetch(`/api/jobs/${jobId}`);
-        if (!res.ok) return;
+        const res = await fetch("/api/content/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pageId: candidate.pageId,
+            title: candidate.title,
+            difficulty,
+          }),
+        });
+
         const data = await res.json();
-        const job = data.job;
+        if (!res.ok) throw new Error(data.error || "Generation request failed");
 
-        setJobProgress(job.progressPercent || 25);
-        setJobMessage(job.message || "Synthesizing content...");
-
-        if (job.status === "completed" && job.contentId) {
-          clearInterval(interval);
+        if (data.cached && data.contentId) {
+          // Cached quiz immediately ready
+          setJobProgress(100);
+          setJobMessage("Archive match found! Entering arena...");
           setTimeout(() => {
-            router.push(`/quiz/${job.contentId}`);
-          }, 800);
-        } else if (job.status === "failed") {
-          clearInterval(interval);
-          setJobError(job.error || "Generation failed.");
-          setActiveJobId(null);
+            router.push(`/quiz/${data.contentId}?difficulty=${difficulty}`);
+          }, 600);
+          return;
         }
-      } catch (err) {
-        console.error("Poll error:", err);
+
+        // Track async job via SSE or polling
+        setActiveJobId(data.jobId);
+        listenToJob(data.jobId);
+      } catch (err: any) {
+        setJobError(err.message || "Failed to initiate generation");
+        setActiveJobId(null);
       }
-    }, 1500);
-  }, [router]);
+    },
+    [router, listenToJob, difficulty]
+  );
 
-  const listenToJob = useCallback((jobId: string) => {
-    const eventSource = new EventSource(`/api/jobs/${jobId}/stream`);
+  const executeResolve = useCallback(
+    async (searchTerm: string) => {
+      if (!searchTerm.trim()) return;
 
-    eventSource.addEventListener("update", (e) => {
+      setIsResolving(true);
+      setCandidates([]);
+      setSelectedCandidate(null);
+      setJobError(null);
+
       try {
-        const job = JSON.parse(e.data);
-        setJobProgress(job.progressPercent || 20);
-        setJobMessage(job.message || "Processing...");
+        const res = await fetch("/api/topic/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: searchTerm.trim() }),
+        });
 
-        if (job.status === "completed" && job.contentId) {
-          eventSource.close();
-          setTimeout(() => {
-            router.push(`/quiz/${job.contentId}`);
-          }, 800);
-        } else if (job.status === "failed") {
-          eventSource.close();
-          setJobError(job.error || "Generation encountered an error.");
-          setActiveJobId(null);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Search failed");
+
+        if (!data.candidates || data.candidates.length === 0) {
+          setJobError("No matching historical records found. Try another topic!");
+          setIsResolving(false);
+          return;
         }
-      } catch (err) {
-        console.error("SSE parse error:", err);
-      }
-    });
 
-    eventSource.addEventListener("error", () => {
-      eventSource.close();
-      // Fallback to polling
-      pollJob(jobId);
-    });
-  }, [router, pollJob]);
-
-  const startGeneration = useCallback(async (candidate: WikipediaCandidate) => {
-    setSelectedCandidate(candidate);
-    setCandidates([]);
-    setJobError(null);
-    setJobProgress(10);
-    setJobMessage("Initializing mission generator...");
-
-    try {
-      const res = await fetch("/api/content/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pageId: candidate.pageId,
-          title: candidate.title,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation request failed");
-
-      if (data.cached && data.contentId) {
-        // Cached quiz immediately ready
-        setJobProgress(100);
-        setJobMessage("Archive match found! Entering arena...");
-        setTimeout(() => {
-          router.push(`/quiz/${data.contentId}`);
-        }, 600);
-        return;
-      }
-
-      // Track async job via SSE or polling
-      setActiveJobId(data.jobId);
-      listenToJob(data.jobId);
-    } catch (err: any) {
-      setJobError(err.message || "Failed to initiate generation");
-      setActiveJobId(null);
-    }
-  }, [router, listenToJob]);
-
-  const executeResolve = useCallback(async (searchTerm: string) => {
-    if (!searchTerm.trim()) return;
-
-    setIsResolving(true);
-    setCandidates([]);
-    setSelectedCandidate(null);
-    setJobError(null);
-
-    try {
-      const res = await fetch("/api/topic/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchTerm.trim() }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search failed");
-
-      if (!data.candidates || data.candidates.length === 0) {
-        setJobError("No matching historical records found. Try another topic!");
+        if (data.candidates.length === 1) {
+          startGeneration(data.candidates[0]);
+        } else {
+          setCandidates(data.candidates);
+        }
+      } catch (err: any) {
+        setJobError(err.message || "Failed to resolve topic.");
+      } finally {
         setIsResolving(false);
-        return;
       }
+    },
+    [startGeneration]
+  );
 
-      if (data.candidates.length === 1) {
-        // Direct match, start generation immediately
-        startGeneration(data.candidates[0]);
-      } else {
-        // Disambiguation needed
-        setCandidates(data.candidates);
-      }
-    } catch (err: any) {
-      setJobError(err.message || "Failed to resolve topic.");
-    } finally {
-      setIsResolving(false);
-    }
-  }, [startGeneration]);
-
-  // If query parameter is provided on mount (e.g. from follow-up topic chips), auto-trigger search
   useEffect(() => {
     if (queryParam && queryParam.trim().length > 0) {
       setQuery(queryParam);
@@ -191,6 +234,41 @@ function HomeContent() {
     if (!query.trim() || isResolving) return;
     executeResolve(query);
   };
+
+  const getDifficultyMeta = (level: number) => {
+    switch (level) {
+      case 1:
+        return {
+          badgeText: "LEVEL 1: RECRUIT",
+          badgeStyle: "border-emerald-500/50 text-emerald-400 bg-emerald-500/10",
+          tagLabel: "RECRUIT",
+          tagColor: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10",
+          description:
+            "Casual / Foundational: Direct questions on iconic events, famous leaders, and core dates.",
+        };
+      case 3:
+        return {
+          badgeText: "LEVEL 3: LEGEND",
+          badgeStyle: "border-amber-500/50 text-amber-400 bg-amber-500/10 shadow-glow-yellow",
+          tagLabel: "LEGEND",
+          tagColor: "border-amber-500/40 text-amber-400 bg-amber-500/10",
+          description:
+            "Expert / High Challenge: Deep strategic dilemmas, subtle distinctions, and nuanced timelines.",
+        };
+      case 2:
+      default:
+        return {
+          badgeText: "LEVEL 2: VETERAN",
+          badgeStyle: "border-cyan-500/50 text-cyan-400 bg-cyan-500/10",
+          tagLabel: "VETERAN",
+          tagColor: "border-cyan-500/40 text-cyan-400 bg-cyan-500/10",
+          description:
+            "Standard / Strategic: Balanced questions analyzing turning points, causes, and consequences.",
+        };
+    }
+  };
+
+  const currentDiffMeta = getDifficultyMeta(difficulty);
 
   return (
     <div className="space-y-12 pb-16">
@@ -225,7 +303,7 @@ function HomeContent() {
             <button
               type="submit"
               disabled={isResolving || activeJobId !== null || !query.trim()}
-              className="tactile-btn gamer-cut px-8 py-4 bg-gradient-to-r from-game-yellow via-amber-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-game-bg font-heading text-xl font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="tactile-btn gamer-cut px-8 py-4 bg-gradient-to-r from-game-yellow via-amber-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-game-bg font-heading text-xl font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-tactile"
             >
               {isResolving ? (
                 <>
@@ -240,6 +318,90 @@ function HomeContent() {
               )}
             </button>
           </form>
+
+          {/* Horizontal Difficulty Selector Bar */}
+          <div className="mt-6 pt-5 border-t border-game-purple/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="difficulty-slider"
+                className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Shield className="w-4 h-4 text-game-yellow" /> MISSION DIFFICULTY LEVEL
+              </label>
+              <span
+                className={`font-heading text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border transition-all ${currentDiffMeta.badgeStyle}`}
+              >
+                {currentDiffMeta.badgeText}
+              </span>
+            </div>
+
+            {/* Range Slider Track */}
+            <div className="relative py-1">
+              <input
+                id="difficulty-slider"
+                type="range"
+                min="1"
+                max="3"
+                step="1"
+                value={difficulty}
+                onChange={(e) => {
+                  setDifficulty(Number(e.target.value));
+                  soundFX.playClick();
+                }}
+                className="w-full h-3 bg-game-bg rounded-lg appearance-none cursor-pointer accent-game-yellow border border-game-border focus:outline-none"
+              />
+
+              {/* 3 Interactive Notches */}
+              <div className="grid grid-cols-3 text-center text-xs font-heading uppercase italic tracking-wider mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDifficulty(1);
+                    soundFX.playClick();
+                  }}
+                  className={`text-left transition-all ${
+                    difficulty === 1
+                      ? "text-emerald-400 font-black scale-105"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  ● 1. RECRUIT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDifficulty(2);
+                    soundFX.playClick();
+                  }}
+                  className={`text-center transition-all ${
+                    difficulty === 2
+                      ? "text-cyan-400 font-black scale-105"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  ● 2. VETERAN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDifficulty(3);
+                    soundFX.playClick();
+                  }}
+                  className={`text-right transition-all ${
+                    difficulty === 3
+                      ? "text-amber-400 font-black scale-105"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  ● 3. LEGEND
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 font-medium">
+              💡 {currentDiffMeta.description}
+            </p>
+          </div>
 
           {jobError && (
             <div className="mt-4 p-4 rounded-xl bg-game-red/20 border border-game-red text-red-200 text-sm font-semibold">
@@ -307,16 +469,125 @@ function HomeContent() {
         </section>
       )}
 
-      {/* Recent Missions Grid */}
+      {/* Battle Archive & Combat Log */}
+      {battleLog.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between border-b border-game-border pb-3">
+            <div className="flex items-center gap-2 text-white font-heading text-2xl uppercase tracking-wider italic">
+              <History className="w-6 h-6 text-game-yellow" />
+              COMBAT ARCHIVE &amp; BATTLE LOG
+            </div>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              {battleLog.length} {battleLog.length === 1 ? "MISSION LOGGED" : "MISSIONS LOGGED"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {battleLog.map((battle) => {
+              const isPerfect = battle.score === battle.nQuestions;
+              const isVictory = battle.score >= Math.ceil(battle.nQuestions * 0.7);
+              const diffMeta = getDifficultyMeta(battle.difficulty || 2);
+
+              const formattedDate = battle.finishedAt
+                ? new Date(battle.finishedAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Recent";
+
+              return (
+                <div
+                  key={battle.attemptId}
+                  className={`bg-game-surface border-2 ${
+                    isPerfect
+                      ? "border-game-yellow/70 shadow-glow-yellow"
+                      : isVictory
+                      ? "border-game-green/50"
+                      : "border-game-border"
+                  } rounded-2xl p-5 flex flex-col justify-between space-y-4 hover:-translate-y-0.5 transition-all`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${diffMeta.tagColor}`}
+                        >
+                          {diffMeta.tagLabel}
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {formattedDate}
+                        </span>
+                      </div>
+                      <h3 className="font-heading text-xl text-white uppercase italic line-clamp-1">
+                        {battle.topicName}
+                      </h3>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1 text-sm font-heading font-black text-game-yellow">
+                        <Trophy className="w-4 h-4 text-game-yellow" />
+                        <span>
+                          {battle.score} / {battle.nQuestions}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-bold text-game-blue uppercase tracking-wider">
+                        +{battle.totalXpEarned} XP
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-game-border/60">
+                    <span
+                      className={`text-xs font-bold uppercase tracking-wider ${
+                        isPerfect
+                          ? "text-game-yellow"
+                          : isVictory
+                          ? "text-game-green"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      {isPerfect
+                        ? "👑 PERFECT VICTORY"
+                        : isVictory
+                        ? "⚔️ MISSION CLEARED"
+                        : "🛡️ MISSION COMPLETE"}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/results/${battle.attemptId}`)}
+                        className="tactile-btn px-3 py-1.5 bg-game-surfaceLight border border-game-border hover:border-game-blue text-white rounded-lg font-heading text-xs uppercase tracking-wider flex items-center gap-1"
+                      >
+                        VIEW DEBRIEF
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(`/quiz/${battle.contentId}?difficulty=${difficulty}`)
+                        }
+                        className="tactile-btn px-3 py-1.5 bg-game-purple hover:bg-game-purple-dark text-white rounded-lg font-heading text-xs uppercase tracking-wider flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" /> REMATCH
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Recent Topic Archives Grid */}
       {recentTopics.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-white font-heading text-2xl uppercase tracking-wider italic">
             <BookOpen className="w-6 h-6 text-game-purple" />
-            RECENT BATTLE MISSIONS
+            DISCOVERED HISTORICAL TOPICS
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentTopics.map((topic, idx) => {
-              // Cycle through game rarity colors
               const rarityStyles = [
                 "border-game-rarity-legendary hover:shadow-glow-yellow",
                 "border-game-rarity-epic hover:shadow-glow-purple",
@@ -332,7 +603,7 @@ function HomeContent() {
                 >
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                      CHRONO RECORD #{topic.id.slice(-4)}
+                      CHRONO ARCHIVE #{topic.id.slice(-4)}
                     </div>
                     <h3 className="font-heading text-xl text-white uppercase italic line-clamp-1 mb-2">
                       {topic.name}
@@ -340,10 +611,12 @@ function HomeContent() {
                   </div>
                   <div className="mt-4 pt-3 border-t border-game-border flex items-center justify-between">
                     <span className="text-xs text-slate-400 font-semibold">
-                      Ready for Replay
+                      Instant Replay
                     </span>
                     <button
-                      onClick={() => router.push(`/quiz/${topic.contentId}`)}
+                      onClick={() =>
+                        router.push(`/quiz/${topic.contentId}?difficulty=${difficulty}`)
+                      }
                       className="tactile-btn px-4 py-2 bg-game-purple hover:bg-game-purple-dark text-white rounded-lg font-heading text-sm uppercase tracking-wider flex items-center gap-1.5"
                     >
                       ENTER <ArrowRight className="w-3.5 h-3.5" />

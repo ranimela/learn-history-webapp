@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PublicQuizSession, PublicQuizQuestion } from "@/lib/schemas";
 import {
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   Loader2,
   Award,
   Zap,
+  Shield,
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
 
@@ -22,10 +23,14 @@ interface AnswerFeedback {
   explanation: string;
 }
 
-export default function QuizRunnerPage() {
+function QuizRunnerContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const contentId = params.contentId as string;
+  const difficultyParam = searchParams.get("difficulty") || "2";
+  const difficultyLevel = Math.min(3, Math.max(1, parseInt(difficultyParam, 10) || 2));
 
   const [session, setSession] = useState<PublicQuizSession | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -45,8 +50,8 @@ export default function QuizRunnerPage() {
     async function initQuiz() {
       try {
         setLoading(true);
-        // 1. Fetch sanitized questions
-        const quizRes = await fetch(`/api/quiz/${contentId}`);
+        // 1. Fetch sanitized questions with difficulty preference
+        const quizRes = await fetch(`/api/quiz/${contentId}?difficulty=${difficultyLevel}`);
         if (!quizRes.ok) {
           const errData = await quizRes.json();
           throw new Error(errData.error || "Failed to load quiz questions");
@@ -61,6 +66,7 @@ export default function QuizRunnerPage() {
           body: JSON.stringify({
             contentId,
             nQuestions: sessionData.questions.length,
+            difficulty: difficultyLevel,
           }),
         });
 
@@ -80,31 +86,31 @@ export default function QuizRunnerPage() {
     if (contentId) {
       initQuiz();
     }
-  }, [contentId]);
+  }, [contentId, difficultyLevel]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="w-12 h-12 text-game-blue animate-spin" />
         <div className="font-heading text-2xl text-white uppercase italic tracking-wider">
-          PREPARING BATTLE QUESTIONS...
+          LOADING BATTLE MISSION...
         </div>
       </div>
     );
   }
 
-  if (error || !session || !attemptId) {
+  if (error || !session || session.questions.length === 0) {
     return (
       <div className="max-w-md mx-auto mt-12 p-8 bg-game-surface border-2 border-game-red rounded-2xl text-center">
         <h2 className="font-heading text-2xl text-game-red uppercase italic mb-2">
-          MISSION ABORTED
+          MISSION UNAVAILABLE
         </h2>
         <p className="text-slate-300 font-semibold mb-6">
-          {error || "Unable to start quiz session."}
+          {error || "Unable to load mission challenges."}
         </p>
         <button
           onClick={() => router.push("/")}
-          className="tactile-btn px-6 py-3 bg-game-surfaceLight border border-game-border hover:border-white text-white rounded-xl font-heading uppercase"
+          className="tactile-btn px-6 py-3 bg-game-surfaceLight border border-game-border text-white rounded-xl font-heading uppercase"
         >
           Return to Mission Control
         </button>
@@ -112,12 +118,21 @@ export default function QuizRunnerPage() {
     );
   }
 
-  const currentQ: PublicQuizQuestion = session.questions[currentIndex];
-  const isLastQuestion = currentIndex === session.questions.length - 1;
+  const currentQ = session.questions[currentIndex];
+  const progressPercent = ((currentIndex + 1) / session.totalQuestions) * 100;
+  const isLastQuestion = currentIndex === session.totalQuestions - 1;
+
+  const difficultyMeta =
+    difficultyLevel === 1
+      ? { label: "RECRUIT", color: "border-emerald-500/50 text-emerald-400 bg-emerald-500/15" }
+      : difficultyLevel === 3
+      ? { label: "LEGEND", color: "border-amber-500/50 text-amber-400 bg-amber-500/15 shadow-glow-yellow" }
+      : { label: "VETERAN", color: "border-cyan-500/50 text-cyan-400 bg-cyan-500/15" };
 
   const handleSelectOption = async (chosenIdx: number | null) => {
-    if (selectedIdx !== null || isSubmitting) return;
+    if (isSubmitting || feedback !== null || !attemptId) return;
 
+    soundFX.playClick();
     setSelectedIdx(chosenIdx);
     setIsSubmitting(true);
     const timeSpentMs = Date.now() - questionStartTime;
@@ -175,7 +190,10 @@ export default function QuizRunnerPage() {
       await fetch("/api/question/flag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: currentQ.id }),
+        body: JSON.stringify({
+          questionId: currentQ.id,
+          reason: "User flagged for review",
+        }),
       });
       setIsFlagged(true);
     } catch (err) {
@@ -188,17 +206,24 @@ export default function QuizRunnerPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Top HUD Bar */}
-      <div className="flex items-center justify-between bg-game-surface border-2 border-game-border px-6 py-4 rounded-2xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-game-surface border-2 border-game-border px-6 py-4 rounded-2xl">
         <div>
-          <div className="text-[11px] font-bold text-game-blue uppercase tracking-widest">
-            {session.topicTitle}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-game-blue uppercase tracking-widest">
+              {session.topicTitle}
+            </span>
+            <span
+              className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${difficultyMeta.color}`}
+            >
+              {difficultyMeta.label}
+            </span>
           </div>
           <div className="font-heading text-xl text-white uppercase italic">
             QUESTION {currentIndex + 1} OF {session.totalQuestions}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 self-end sm:self-auto">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-game-surfaceLight border border-game-border text-game-yellow font-heading text-base">
             <Award className="w-4 h-4" />
             SCORE: {currentScore}
@@ -218,105 +243,111 @@ export default function QuizRunnerPage() {
       </div>
 
       {/* Progress Track */}
-      <div className="w-full bg-game-surface h-2.5 rounded-full overflow-hidden border border-game-border p-0.5">
+      <div className="w-full bg-game-surfaceLight h-2.5 rounded-full overflow-hidden border border-game-border">
         <div
           className="bg-gradient-to-r from-game-purple via-game-blue to-game-yellow h-full rounded-full transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / session.totalQuestions) * 100}%` }}
+          style={{ width: `${progressPercent}%` }}
         />
       </div>
 
       {/* Question Card */}
       <div className="bg-game-surface border-2 border-game-border rounded-3xl p-6 sm:p-10 shadow-2xl space-y-8">
-        <h2 className="font-heading text-2xl sm:text-3xl text-white tracking-wide leading-snug">
+        <h2 className="font-heading text-2xl sm:text-3xl text-white uppercase italic leading-tight tracking-wide">
           {currentQ.stem}
         </h2>
 
-        {/* 4 Multiple Choice Options */}
+        {/* Options Grid */}
         <div className="grid grid-cols-1 gap-3.5">
-          {currentQ.options.map((opt, idx) => {
-            let btnStyle = "bg-game-surfaceLight border-game-border text-slate-200 hover:border-game-blue hover:text-white";
-            let badgeStyle = "bg-game-surface text-slate-400 border-game-border";
+          {currentQ.options.map((optText, optIdx) => {
+            let optionStyles =
+              "bg-game-surfaceLight border-game-border hover:border-game-blue text-slate-200";
 
-            if (feedback) {
-              if (idx === feedback.correctIdx) {
-                // Correct answer lights up green
-                btnStyle = "bg-game-green/20 border-game-green text-green-200 shadow-glow-green";
-                badgeStyle = "bg-game-green text-game-bg border-game-green font-black";
-              } else if (idx === selectedIdx && !feedback.isCorrect) {
-                // Wrong chosen answer lights up red
-                btnStyle = "bg-game-red/20 border-game-red text-red-200";
-                badgeStyle = "bg-game-red text-white border-game-red font-black";
+            if (feedback !== null) {
+              if (optIdx === feedback.correctIdx) {
+                // Correct Answer
+                optionStyles =
+                  "bg-game-green/20 border-game-green text-green-200 shadow-glow-green";
+              } else if (optIdx === selectedIdx && !feedback.isCorrect) {
+                // Chosen Wrong Answer
+                optionStyles =
+                  "bg-game-red/20 border-game-red text-red-200 shadow-glow-red animate-shake";
               } else {
-                btnStyle = "bg-game-surfaceLight/50 border-game-border/50 text-slate-500 opacity-60";
+                optionStyles =
+                  "bg-game-surfaceLight/40 border-game-border/40 text-slate-500 opacity-60";
               }
+            } else if (selectedIdx === optIdx) {
+              optionStyles = "bg-game-blue/20 border-game-blue text-white";
             }
 
             return (
               <button
-                key={idx}
+                key={optIdx}
                 disabled={feedback !== null || isSubmitting}
-                onClick={() => handleSelectOption(idx)}
-                className={`tactile-btn text-left p-4 sm:p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${btnStyle}`}
+                onClick={() => handleSelectOption(optIdx)}
+                className={`tactile-btn w-full p-4 sm:p-5 rounded-2xl border-2 flex items-center gap-4 text-left transition-all ${optionStyles}`}
               >
                 <div
-                  className={`w-10 h-10 rounded-xl border flex items-center justify-center font-heading text-lg shrink-0 ${badgeStyle}`}
+                  className={`w-9 h-9 rounded-xl border flex items-center justify-center font-heading text-lg font-bold shrink-0 ${
+                    feedback !== null && optIdx === feedback.correctIdx
+                      ? "bg-game-green text-white border-game-green"
+                      : feedback !== null && optIdx === selectedIdx && !feedback.isCorrect
+                      ? "bg-game-red text-white border-game-red"
+                      : "bg-game-bg border-game-border text-slate-400"
+                  }`}
                 >
-                  {optionLabels[idx]}
+                  {feedback !== null && optIdx === feedback.correctIdx ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : feedback !== null && optIdx === selectedIdx && !feedback.isCorrect ? (
+                    <XCircle className="w-5 h-5" />
+                  ) : (
+                    optionLabels[optIdx]
+                  )}
                 </div>
-                <span className="text-base sm:text-lg font-semibold flex-1">
-                  {opt}
-                </span>
-                {feedback && idx === feedback.correctIdx && (
-                  <CheckCircle2 className="w-6 h-6 text-game-green shrink-0" />
-                )}
-                {feedback && idx === selectedIdx && !feedback.isCorrect && (
-                  <XCircle className="w-6 h-6 text-game-red shrink-0" />
-                )}
+                <div className="font-semibold text-base sm:text-lg flex-1">
+                  {optText}
+                </div>
               </button>
             );
           })}
         </div>
 
-        {/* "I Don't Know" Button */}
-        {!feedback && (
-          <div className="pt-2 flex justify-center">
+        {/* Skip Button (I Don't Know) */}
+        {feedback === null && (
+          <div className="flex justify-center pt-2">
             <button
-              disabled={isSubmitting}
               onClick={() => handleSelectOption(null)}
-              className="px-6 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 text-sm font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-game-surfaceLight transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
             >
-              <HelpCircle className="w-4 h-4" />
-              I don&apos;t know yet (Skip for 0 XP)
+              <HelpCircle className="w-4 h-4" /> I Don&apos;t Know (Reveal Answer)
             </button>
           </div>
         )}
 
-        {/* Instant Pedagogical Feedback Reveal */}
-        {feedback && (
+        {/* Instant Feedback Drawer */}
+        {feedback !== null && (
           <div
-            className={`p-6 rounded-2xl border-2 animate-in fade-in space-y-3 ${
+            className={`p-6 rounded-2xl border-2 space-y-3 animate-in fade-in ${
               feedback.isCorrect
-                ? "bg-game-green/10 border-game-green/50 text-green-200"
-                : feedback.isSkipped
-                ? "bg-slate-800/40 border-slate-700 text-slate-300"
-                : "bg-game-red/10 border-game-red/50 text-red-200"
+                ? "bg-game-green/10 border-game-green text-green-100"
+                : "bg-game-surfaceLight border-game-border text-slate-100"
             }`}
           >
-            <div className="flex items-center gap-2 font-heading text-xl uppercase italic">
+            <div className="flex items-center gap-2 font-heading text-xl uppercase tracking-wider italic">
               {feedback.isCorrect ? (
                 <>
                   <CheckCircle2 className="w-6 h-6 text-game-green" />
-                  VICTORY! +10 XP
+                  <span>DIRECT HIT! +10 XP</span>
                 </>
               ) : feedback.isSkipped ? (
                 <>
-                  <HelpCircle className="w-6 h-6 text-slate-400" />
-                  LEARN THIS ARCHIVE CARD
+                  <HelpCircle className="w-6 h-6 text-game-yellow" />
+                  <span>MISSION INTEL REVEALED</span>
                 </>
               ) : (
                 <>
                   <XCircle className="w-6 h-6 text-game-red" />
-                  MISSED! LEARN THIS CARD
+                  <span>TARGET MISSED — STUDY THE RECORD</span>
                 </>
               )}
             </div>
@@ -337,5 +368,19 @@ export default function QuizRunnerPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function QuizRunnerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Loader2 className="w-12 h-12 text-game-blue animate-spin" />
+        </div>
+      }
+    >
+      <QuizRunnerContent />
+    </Suspense>
   );
 }

@@ -67,9 +67,16 @@ export async function ensureTablesExist(): Promise<void> {
       finished_at TEXT,
       score INTEGER NOT NULL DEFAULT 0,
       n_questions INTEGER NOT NULL DEFAULT 10,
+      difficulty INTEGER NOT NULL DEFAULT 2,
       total_xp_earned INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  try {
+    await client.execute(`ALTER TABLE attempts ADD COLUMN difficulty INTEGER NOT NULL DEFAULT 2;`);
+  } catch {
+    // Ignore if column already exists
+  }
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS answers (

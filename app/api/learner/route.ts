@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureTablesExist } from "@/lib/db/client";
-import { learnerProfile, topics, contents } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { learnerProfile, topics, contents, attempts } from "@/lib/db/schema";
+import { eq, desc, sql } from "drizzle-orm";
 import { computeLevelInfo } from "@/lib/grading";
 
 export async function GET(_req: NextRequest) {
@@ -49,6 +49,26 @@ export async function GET(_req: NextRequest) {
       .limit(6)
       .all();
 
+    // Query battle history log of finished attempts
+    const battleLog = await db
+      .select({
+        attemptId: attempts.id,
+        contentId: attempts.contentId,
+        topicName: topics.name,
+        score: attempts.score,
+        nQuestions: attempts.nQuestions,
+        difficulty: attempts.difficulty,
+        totalXpEarned: attempts.totalXpEarned,
+        finishedAt: attempts.finishedAt,
+      })
+      .from(attempts)
+      .innerJoin(contents, eq(attempts.contentId, contents.id))
+      .innerJoin(topics, eq(contents.topicId, topics.id))
+      .where(sql`${attempts.finishedAt} IS NOT NULL`)
+      .orderBy(desc(attempts.finishedAt))
+      .limit(20)
+      .all();
+
     return NextResponse.json({
       learner: {
         totalXp,
@@ -59,6 +79,7 @@ export async function GET(_req: NextRequest) {
         streakDays: profile?.streakDays || 0,
       },
       recentTopics: recentTopics.filter((t) => t.contentId !== null),
+      battleLog,
     });
   } catch (error: any) {
     console.error("Fetch learner HUD error:", error);
