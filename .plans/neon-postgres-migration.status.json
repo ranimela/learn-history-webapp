@@ -1,7 +1,7 @@
 {
   "feature": "neon-postgres-migration",
   "lane": "full",
-  "state": "validated",
+  "state": "shipped",
   "high_risk": false,
   "gate_mode": "validator",
   "validation_mode": "host",
