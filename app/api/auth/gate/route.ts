@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     const { passcode } = await req.json();
-    const expectedPasscode = process.env.APP_PASSCODE || "history123";
+    const expectedPasscode = process.env.APP_PASSCODE || "jam";
 
     if (passcode !== expectedPasscode) {
       return NextResponse.json({ error: "Invalid passcode" }, { status: 401 });

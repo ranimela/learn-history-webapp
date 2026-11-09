@@ -104,8 +104,8 @@ function GateForm() {
             </button>
           </form>
 
-          <div className="text-[11px] text-slate-400 uppercase tracking-widest pt-2">
-            Default Passcode: <span className="text-game-yellow font-mono">history123</span>
+          <div className="text-[11px] text-slate-400 tracking-wide pt-2">
+            Hint: <span className="text-game-yellow font-medium">What does a civilized human being eat a schnitzel with?</span>
           </div>
         </div>
       </div>
