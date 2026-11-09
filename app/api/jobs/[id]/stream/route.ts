@@ -27,11 +27,11 @@ export async function GET(
         }
 
         try {
-          const job = await db
+          const [job] = await db
             .select()
             .from(generationJobs)
             .where(eq(generationJobs.id, params.id))
-            .get();
+            .limit(1);
 
           if (!job) {
             controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: "Job not found" })}\n\n`));

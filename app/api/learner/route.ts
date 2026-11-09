@@ -8,11 +8,11 @@ export async function GET(_req: NextRequest) {
   try {
     await ensureTablesExist();
 
-    let profile = await db
+    let [profile] = await db
       .select()
       .from(learnerProfile)
       .where(eq(learnerProfile.learnerId, 1))
-      .get();
+      .limit(1);
 
     if (!profile) {
       await db.insert(learnerProfile).values({
@@ -24,11 +24,12 @@ export async function GET(_req: NextRequest) {
         lastActiveDate: null,
       });
 
-      profile = await db
+      const [fetched] = await db
         .select()
         .from(learnerProfile)
         .where(eq(learnerProfile.learnerId, 1))
-        .get();
+        .limit(1);
+      profile = fetched;
     }
 
     const totalXp = profile?.totalXp || 0;
@@ -47,8 +48,7 @@ export async function GET(_req: NextRequest) {
       .from(topics)
       .leftJoin(contents, eq(topics.id, contents.topicId))
       .orderBy(desc(topics.lastStudiedAt))
-      .limit(6)
-      .all();
+      .limit(6);
 
     // Query battle history log of finished attempts
     const battleLog = await db
@@ -68,8 +68,7 @@ export async function GET(_req: NextRequest) {
       .innerJoin(topics, eq(contents.topicId, topics.id))
       .where(sql`${attempts.finishedAt} IS NOT NULL`)
       .orderBy(desc(attempts.finishedAt))
-      .limit(20)
-      .all();
+      .limit(20);
 
     return NextResponse.json({
       learner: {

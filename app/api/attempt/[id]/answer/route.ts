@@ -21,22 +21,22 @@ export async function POST(
     const { questionId, chosenIdx, timeMs } = parsed.data;
 
     // Verify attempt exists
-    const attempt = await db
+    const [attempt] = await db
       .select()
       .from(attempts)
       .where(eq(attempts.id, attemptId))
-      .get();
+      .limit(1);
 
     if (!attempt) {
       return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
     }
 
     // Fetch the ground-truth question from DB
-    const question = await db
+    const [question] = await db
       .select()
       .from(questions)
       .where(eq(questions.id, questionId))
-      .get();
+      .limit(1);
 
     if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -73,8 +73,7 @@ export async function POST(
     const allAnswersForAttempt = await db
       .select()
       .from(answers)
-      .where(eq(answers.attemptId, attemptId))
-      .all();
+      .where(eq(answers.attemptId, attemptId));
 
     const isFinished = allAnswersForAttempt.length >= attempt.nQuestions;
 

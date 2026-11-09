@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const topics = sqliteTable("topics", {
+export const topics = pgTable("topics", {
   id: text("id").primaryKey(),
   learnerId: integer("learner_id").notNull().default(1),
   name: text("name").notNull(),
@@ -10,10 +10,10 @@ export const topics = sqliteTable("topics", {
   lastStudiedAt: text("last_studied_at"),
   createdAt: text("created_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
-export const contents = sqliteTable("contents", {
+export const contents = pgTable("contents", {
   id: text("id").primaryKey(),
   topicId: text("topic_id")
     .notNull()
@@ -26,10 +26,10 @@ export const contents = sqliteTable("contents", {
   model: text("model").notNull(),
   createdAt: text("created_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
-export const questions = sqliteTable("questions", {
+export const questions = pgTable("questions", {
   id: text("id").primaryKey(),
   contentId: text("content_id")
     .notNull()
@@ -40,14 +40,14 @@ export const questions = sqliteTable("questions", {
   explanation: text("explanation").notNull(),
   factId: text("fact_id").notNull(),
   difficulty: integer("difficulty").notNull().default(3), // 1-5
-  isDateRecall: integer("is_date_recall", { mode: "boolean" }).notNull().default(false),
-  flagged: integer("flagged", { mode: "boolean" }).notNull().default(false),
+  isDateRecall: boolean("is_date_recall").notNull().default(false),
+  flagged: boolean("flagged").notNull().default(false),
   createdAt: text("created_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
-export const attempts = sqliteTable("attempts", {
+export const attempts = pgTable("attempts", {
   id: text("id").primaryKey(),
   learnerId: integer("learner_id").notNull().default(1),
   contentId: text("content_id")
@@ -55,7 +55,7 @@ export const attempts = sqliteTable("attempts", {
     .references(() => contents.id, { onDelete: "cascade" }),
   startedAt: text("started_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
   finishedAt: text("finished_at"),
   score: integer("score").notNull().default(0),
   nQuestions: integer("n_questions").notNull().default(10),
@@ -63,7 +63,7 @@ export const attempts = sqliteTable("attempts", {
   totalXpEarned: integer("total_xp_earned").notNull().default(0),
 });
 
-export const answers = sqliteTable("answers", {
+export const answers = pgTable("answers", {
   id: text("id").primaryKey(),
   attemptId: text("attempt_id")
     .notNull()
@@ -72,14 +72,14 @@ export const answers = sqliteTable("answers", {
     .notNull()
     .references(() => questions.id, { onDelete: "cascade" }),
   chosenIdx: integer("chosen_idx"), // null = "I don't know"
-  correct: integer("correct", { mode: "boolean" }).notNull().default(false),
+  correct: boolean("correct").notNull().default(false),
   timeMs: integer("time_ms").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
-export const generationJobs = sqliteTable("generation_jobs", {
+export const generationJobs = pgTable("generation_jobs", {
   id: text("id").primaryKey(),
   topicId: text("topic_id"),
   wikiPageId: integer("wiki_page_id").notNull(),
@@ -91,13 +91,13 @@ export const generationJobs = sqliteTable("generation_jobs", {
   contentId: text("content_id"),
   createdAt: text("created_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
   updatedAt: text("updated_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
-export const learnerProfile = sqliteTable("learner_profile", {
+export const learnerProfile = pgTable("learner_profile", {
   id: text("id").primaryKey(),
   learnerId: integer("learner_id").notNull().default(1).unique(),
   totalXp: integer("total_xp").notNull().default(0),
@@ -106,7 +106,7 @@ export const learnerProfile = sqliteTable("learner_profile", {
   lastActiveDate: text("last_active_date"),
   updatedAt: text("updated_at")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`CURRENT_TIMESTAMP::text`),
 });
 
 export type Topic = typeof topics.$inferSelect;

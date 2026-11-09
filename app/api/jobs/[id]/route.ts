@@ -8,11 +8,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const job = await db
+    const [job] = await db
       .select()
       .from(generationJobs)
       .where(eq(generationJobs.id, params.id))
-      .get();
+      .limit(1);
 
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
