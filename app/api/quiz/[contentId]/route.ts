@@ -9,27 +9,26 @@ export async function GET(
   { params }: { params: { contentId: string } }
 ) {
   try {
-    const content = await db
+    const [content] = await db
       .select()
       .from(contents)
       .where(eq(contents.id, params.contentId))
-      .get();
+      .limit(1);
 
     if (!content) {
       return NextResponse.json({ error: "Quiz content not found" }, { status: 404 });
     }
 
-    const topic = await db
+    const [topic] = await db
       .select()
       .from(topics)
       .where(eq(topics.id, content.topicId))
-      .get();
+      .limit(1);
 
     const allQuestions = await db
       .select()
       .from(questions)
-      .where(and(eq(questions.contentId, params.contentId), eq(questions.flagged, false)))
-      .all();
+      .where(and(eq(questions.contentId, params.contentId), eq(questions.flagged, false)));
 
     if (allQuestions.length === 0) {
       return NextResponse.json({ error: "No active questions available for this quiz" }, { status: 400 });

@@ -21,27 +21,26 @@ export async function POST(req: NextRequest) {
 
     // Check if content already generated and cached for this Wikipedia page at THIS difficulty level
     if (!refresh) {
-      const existingTopic = await db
+      const [existingTopic] = await db
         .select()
         .from(topics)
         .where(eq(topics.wikiPageId, pageId))
-        .get();
+        .limit(1);
 
       if (existingTopic) {
         // Find content for this topic specifically with matching difficulty
-        const existingContent = await db
+        const [existingContent] = await db
           .select()
           .from(contents)
           .where(and(eq(contents.topicId, existingTopic.id), eq(contents.difficulty, difficulty)))
-          .get();
+          .limit(1);
 
         if (existingContent) {
           // Verify that this content has at least 8 questions matching the difficulty
           const allPoolQuestions = await db
             .select()
             .from(questions)
-            .where(eq(questions.contentId, existingContent.id))
-            .all();
+            .where(eq(questions.contentId, existingContent.id));
 
           const matchingQuestions = allPoolQuestions.filter((q) => {
             if (difficulty === 1) return q.difficulty <= 2;
@@ -62,8 +61,7 @@ export async function POST(req: NextRequest) {
       const oldTopics = await db
         .select()
         .from(topics)
-        .where(eq(topics.wikiPageId, pageId))
-        .all();
+        .where(eq(topics.wikiPageId, pageId));
       for (const ot of oldTopics) {
         await db.delete(topics).where(eq(topics.id, ot.id));
       }
@@ -149,11 +147,11 @@ async function executeGenerationPipeline(
     }
 
     // 4. Persistence into database
-    let existingTopic = await db
+    const [existingTopic] = await db
       .select()
       .from(topics)
       .where(eq(topics.wikiPageId, pageId))
-      .get();
+      .limit(1);
 
     let topicId = existingTopic?.id;
     if (!topicId) {

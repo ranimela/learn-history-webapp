@@ -1,0 +1,23 @@
+{
+  "feature": "neon-postgres-migration",
+  "lane": "full",
+  "state": "validated",
+  "high_risk": false,
+  "gate_mode": "validator",
+  "validation_mode": "host",
+  "review_rounds": 0,
+  "tasks_total": 4,
+  "tasks_done": 4,
+  "current_task": 4,
+  "fix_attempts": 0,
+  "validator_token": {
+    "result": "PASS",
+    "task": 4,
+    "timestamp": "2026-11-09T09:20:25Z"
+  },
+  "blocked": {
+    "by": null,
+    "reason": null,
+    "from_state": null
+  }
+}

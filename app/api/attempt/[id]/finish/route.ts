@@ -11,38 +11,37 @@ export async function POST(
   try {
     const attemptId = params.id;
 
-    const attempt = await db
+    const [attempt] = await db
       .select()
       .from(attempts)
       .where(eq(attempts.id, attemptId))
-      .get();
+      .limit(1);
 
     if (!attempt) {
       return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
     }
 
-    const content = await db
+    const [content] = await db
       .select()
       .from(contents)
       .where(eq(contents.id, attempt.contentId))
-      .get();
+      .limit(1);
 
     if (!content) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
-    const topic = await db
+    const [topic] = await db
       .select()
       .from(topics)
       .where(eq(topics.id, content.topicId))
-      .get();
+      .limit(1);
 
     // Check if first-time topic attempt
     const priorAttemptsOnContent = await db
       .select()
       .from(attempts)
-      .where(and(eq(attempts.contentId, attempt.contentId), sql`finished_at IS NOT NULL`))
-      .all();
+      .where(and(eq(attempts.contentId, attempt.contentId), sql`finished_at IS NOT NULL`));
 
     const isFirstTimeTopic = priorAttemptsOnContent.length === 0;
 
@@ -69,11 +68,11 @@ export async function POST(
       .where(eq(topics.id, content.topicId));
 
     // Update or initialize Learner Profile
-    let profile = await db
+    let [profile] = await db
       .select()
       .from(learnerProfile)
       .where(eq(learnerProfile.learnerId, 1))
-      .get();
+      .limit(1);
 
     if (!profile) {
       await db.insert(learnerProfile).values({
@@ -84,11 +83,12 @@ export async function POST(
         streakDays: 0,
         lastActiveDate: null,
       });
-      profile = await db
+      const [fetchedProfile] = await db
         .select()
         .from(learnerProfile)
         .where(eq(learnerProfile.learnerId, 1))
-        .get();
+        .limit(1);
+      profile = fetchedProfile;
     }
 
     const newTotalXp = (profile?.totalXp || 0) + xpBreakdown.totalXp;
@@ -110,16 +110,15 @@ export async function POST(
     const attemptAnswers = await db
       .select()
       .from(answers)
-      .where(eq(answers.attemptId, attemptId))
-      .all();
+      .where(eq(answers.attemptId, attemptId));
 
     const reviewQuestions = [];
     for (const ans of attemptAnswers) {
-      const q = await db
+      const [q] = await db
         .select()
         .from(questions)
         .where(eq(questions.id, ans.questionId))
-        .get();
+        .limit(1);
       if (q) {
         let opts: string[] = [];
         try {
