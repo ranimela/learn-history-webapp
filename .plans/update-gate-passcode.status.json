@@ -1,7 +1,7 @@
 {
   "feature": "update-gate-passcode",
   "lane": "quick",
-  "state": "validated",
+  "state": "shipped",
   "high_risk": false,
   "gate_mode": "validator",
   "validation_mode": "host",
