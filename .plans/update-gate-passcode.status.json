@@ -1,0 +1,23 @@
+{
+  "feature": "update-gate-passcode",
+  "lane": "quick",
+  "state": "validated",
+  "high_risk": false,
+  "gate_mode": "validator",
+  "validation_mode": "host",
+  "review_rounds": 0,
+  "tasks_total": 1,
+  "tasks_done": 1,
+  "current_task": 1,
+  "fix_attempts": 0,
+  "validator_token": {
+    "result": "PASS",
+    "task": 1,
+    "timestamp": "2026-11-09T09:35:45Z"
+  },
+  "blocked": {
+    "by": null,
+    "reason": null,
+    "from_state": null
+  }
+}

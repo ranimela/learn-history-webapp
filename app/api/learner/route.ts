@@ -3,6 +3,7 @@ import { db, ensureTablesExist } from "@/lib/db/client";
 import { learnerProfile, topics, contents, attempts } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { computeLevelInfo } from "@/lib/grading";
+export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest) {
   try {
